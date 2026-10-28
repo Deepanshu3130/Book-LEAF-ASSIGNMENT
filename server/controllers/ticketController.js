@@ -1,6 +1,6 @@
 import Ticket from '../models/Ticket.js';
 import Book from '../models/Book.js';
-import { classifyTicket, classifyFallback, draftReply, generatePolicyFallbackDraft } from '../services/aiService.js';
+import { classifyTicket, classifyFallback, normalizeCategory, normalizePriority, draftReply, generatePolicyFallbackDraft } from '../services/aiService.js';
 
 // Creates a new ticket for an author and starts background AI classification
 export const createTicket = async (req, res, next) => {
@@ -33,6 +33,16 @@ export const createTicket = async (req, res, next) => {
       classification = classifyFallback(subject.trim(), description.trim());
     }
 
+    const resolvedCategory =
+      normalizeCategory(classification?.category) ||
+      classifyFallback(subject.trim(), description.trim()).category ||
+      'General Inquiry';
+
+    const resolvedPriority =
+      normalizePriority(classification?.priority) ||
+      classifyFallback(subject.trim(), description.trim()).priority ||
+      'Medium';
+
     // Create ticket immediately with accurate category and priority
     const ticket = await Ticket.create({
       author: req.user.id,
@@ -40,8 +50,8 @@ export const createTicket = async (req, res, next) => {
       subject: subject.trim(),
       description: description.trim(),
       status: 'Open',
-      category: classification.category || 'General Inquiry',
-      priority: classification.priority || 'Medium',
+      category: resolvedCategory,
+      priority: resolvedPriority,
       aiStatus: classification.aiStatus || 'done',
       unreadByAdmin: true,
       unreadByAuthor: false,

@@ -54,6 +54,9 @@ cd "client"
 # Install dependencies
 npm install
 
+# Environment variables
+cp .env.example .env
+
 # Start Vite dev server (runs on http://localhost:5173)
 npm run dev
 ```
@@ -366,7 +369,7 @@ Using Socket.IO:
    - `AI_MODEL`: `gemini-3.5-flash-lite`
 
 ### 3. Frontend (Vercel)
-1. Import the repository on [Vercel](https://vercel.com) and set the root directory to `client`.
+1. Import the repository on [render] and set the root directory to `client`.
 2. Build command: `npm run build`
 3. Output directory: `dist`
 4. Set Environment Variables:

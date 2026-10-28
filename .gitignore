@@ -8,6 +8,8 @@ testPhase4.js
 *.env
 **/.env
 **/.env.*
+!.env.example
+!**/.env.example
 
 # Logs
 npm-debug.log*
