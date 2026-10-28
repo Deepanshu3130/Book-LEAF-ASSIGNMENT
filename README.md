@@ -62,16 +62,18 @@ Visit **`http://localhost:5173`** in your browser.
 
 ---
 
-## Database Connection Details
+## Database Configuration
 
-### MongoDB Atlas Setup
 - **Configured in `server/.env`**:
   ```env
-  MONGODB_URI=mongodb+srv://<username>:<password>@deepanshu.mnlev.mongodb.net/book-leaf?retryWrites=true&w=majority&appName=book-leaf
+  # Local MongoDB instance:
+  MONGODB_URI=mongodb://127.0.0.1:27017/bookleaf
+
+  # Or MongoDB Atlas cloud cluster:
+  # MONGODB_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/<database>?retryWrites=true&w=majority
   ```
-- **Database Name**: `book-leaf`
 - **Collections**:
-  - `users`: Contains 11 accounts (1 admin + 10 authors from sample data).
+  - `users`: Contains accounts (1 admin + 10 authors from sample data).
   - `books`: Contains 18 books linked to authors with live royalty and sales metrics.
   - `tickets`: Holds support queries, replies, and private internal notes.
 
