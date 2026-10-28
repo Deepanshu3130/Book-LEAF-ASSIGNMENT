@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import toast from 'react-hot-toast';
-import { Mail, Lock, ArrowRight } from 'lucide-react';
+import { Mail, Lock, ArrowRight, Sparkles, BookOpen } from 'lucide-react';
 
 export const Login = () => {
   const navigate = useNavigate();
@@ -46,34 +46,69 @@ export const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-page flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
-      {/* Brand Header */}
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center mb-8">
-        <div className="inline-flex items-center space-x-3 mb-4">
-          <div className="w-10 h-10 rounded-md bg-brand flex items-center justify-center text-white font-light text-2xl select-none leading-none">
-            /
+    <div className="min-h-screen bg-blush flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+      {/* Accessible Skip Link */}
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:px-4 focus:py-2 focus:bg-coral focus:text-white focus:rounded-full focus:shadow-md focus:text-xs focus:font-semibold focus:outline-hidden"
+      >
+        Skip to main content
+      </a>
+
+      {/* 1. Decorative blob — Top-Right */}
+      <svg
+        viewBox="-100 -100 200 200"
+        aria-hidden="true"
+        className="absolute -right-20 -top-24 w-72 sm:w-96 opacity-90 pointer-events-none"
+      >
+        <path
+          fill="var(--color-blush-deep)"
+          d="M44.7,-58.3C57.6,-49.4,67.4,-35.1,71.6,-19.3C75.8,-3.5,74.4,13.8,67.1,27.7C59.8,41.6,46.6,52,32.2,59.5C17.8,67,2.2,71.6,-14.4,70.2C-31,68.8,-48.6,61.4,-58.9,48.3C-69.2,35.2,-72.2,16.4,-70.4,-1C-68.6,-18.4,-62,-34.4,-50.8,-43.7C-39.6,-52.9,-23.8,-55.4,-8.7,-57.3C-6.4,-59.2,31.8,-67.2,44.7,-58.3Z"
+        />
+        <path fill="none" stroke="#fff" strokeWidth="1.2" d="M-85 30 C-40 -70, 30 70, 85 -25" />
+        <path fill="none" stroke="#fff" strokeWidth="1.2" d="M-80 50 C-30 -50, 40 80, 90 -5" />
+      </svg>
+
+      {/* 2. Decorative blob — Bottom-Left (Diagonal balance in soft coral & blush) */}
+      <svg
+        viewBox="-100 -100 200 200"
+        aria-hidden="true"
+        className="absolute -left-20 -bottom-24 w-72 sm:w-96 opacity-75 pointer-events-none rotate-180"
+      >
+        <path
+          fill="var(--color-blush-deep)"
+          d="M44.7,-58.3C57.6,-49.4,67.4,-35.1,71.6,-19.3C75.8,-3.5,74.4,13.8,67.1,27.7C59.8,41.6,46.6,52,32.2,59.5C17.8,67,2.2,71.6,-14.4,70.2C-31,68.8,-48.6,61.4,-58.9,48.3C-69.2,35.2,-72.2,16.4,-70.4,-1C-68.6,-18.4,-62,-34.4,-50.8,-43.7C-39.6,-52.9,-23.8,-55.4,-8.7,-57.3C-6.4,-59.2,31.8,-67.2,44.7,-58.3Z"
+        />
+        <path fill="none" stroke="#fff" strokeWidth="1.2" d="M-85 30 C-40 -70, 30 70, 85 -25" />
+        <path fill="none" stroke="#fff" strokeWidth="1.2" d="M-80 50 C-30 -50, 40 80, 90 -5" />
+      </svg>
+
+      {/* Login Card Container */}
+      <main id="main" className="relative z-10 w-full max-w-md animate-fade-in-up flex flex-col items-center">
+        {/* BookLeaf Logo - positioned cleanly above the card */}
+        <div className="flex items-center justify-center space-x-3 mb-6">
+          <div className="w-11 h-11 rounded-xl bg-coral flex items-center justify-center text-white font-light text-2xl select-none shadow-md shadow-coral/25">
+            <span className="inline-block transform -translate-y-0.5">/</span>
           </div>
           <div className="font-display text-left leading-tight">
-            <span className="block text-lg font-semibold tracking-wide text-ink">
+            <span className="block text-xl font-bold text-ink tracking-tight">
               BookLeaf
             </span>
-            <span className="block text-xs font-light text-muted uppercase tracking-wider">
+            <span className="block text-xs font-medium text-muted tracking-wide">
               Publishing
             </span>
           </div>
         </div>
-        <h1 className="text-2xl font-semibold text-ink">Author portal login</h1>
-        <p className="mt-1 text-sm text-muted">
-          Sign in to track your royalties, books, and support inquiries.
-        </p>
-      </div>
 
-      {/* Login Card */}
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-surface border border-line rounded-xl p-6 sm:p-8">
+        <div className="bg-white rounded-2xl p-6 sm:p-8 border border-line shadow-lg shadow-coral/5 w-full">
+          <h1 className="text-xl font-bold text-ink text-center mb-1">Sign in</h1>
+          <p className="text-sm text-muted text-center mb-6">
+            Track your royalties, books, and support inquiries.
+          </p>
+
           <form className="space-y-4" onSubmit={handleSubmit}>
             <div>
-              <label className="block text-xs font-medium text-ink mb-1.5">
+              <label htmlFor="login-email" className="block text-xs font-medium text-ink mb-1.5">
                 Email address
               </label>
               <div className="relative">
@@ -81,18 +116,19 @@ export const Login = () => {
                   <Mail className="w-4 h-4" />
                 </div>
                 <input
+                  id="login-email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="author@email.com"
                   required
-                  className="block w-full pl-9 pr-3 py-2.5 text-sm text-ink border border-line rounded-lg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand focus-visible:border-brand transition-colors"
+                  className="input pl-9"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-ink mb-1.5">
+              <label htmlFor="login-password" className="block text-xs font-medium text-ink mb-1.5">
                 Password
               </label>
               <div className="relative">
@@ -100,12 +136,13 @@ export const Login = () => {
                   <Lock className="w-4 h-4" />
                 </div>
                 <input
+                  id="login-password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   required
-                  className="block w-full pl-9 pr-3 py-2.5 text-sm text-ink border border-line rounded-lg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand focus-visible:border-brand transition-colors"
+                  className="input pl-9"
                 />
               </div>
             </div>
@@ -113,7 +150,7 @@ export const Login = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full mt-2 inline-flex justify-center items-center py-2.5 px-6 rounded-full text-sm font-medium text-white bg-brand hover:bg-brand-dark transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-brand disabled:opacity-50"
+              className="btn-primary w-full mt-2"
             >
               {loading ? (
                 <span>Signing in...</span>
@@ -128,30 +165,45 @@ export const Login = () => {
 
           {/* Quick test credentials */}
           <div className="mt-6 pt-6 border-t border-line">
-            <p className="text-xs text-muted mb-3 text-center">
-              Quick test accounts
-            </p>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs text-muted font-medium">Quick test accounts</span>
+              <span className="text-[10px] text-coral-deep bg-blush px-2 py-0.5 rounded-full font-semibold">
+                Click to fill
+              </span>
+            </div>
             <div className="grid grid-cols-2 gap-2 text-xs">
               <button
                 type="button"
                 onClick={() => fillCredentials('priya.sharma@email.com', 'author123')}
-                className="p-2.5 bg-surface hover:bg-blush/40 text-ink rounded-lg border border-line hover:border-brand transition-colors text-left"
+                className="p-2.5 bg-white hover:bg-blush-soft text-ink rounded-xl border border-line hover:border-coral/40 transition-colors text-left focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-coral cursor-pointer group"
               >
-                <div className="font-semibold text-ink">Author</div>
+                <div className="font-semibold text-ink group-hover:text-coral-deep transition-colors">Author</div>
                 <div className="text-muted truncate">Priya Sharma</div>
               </button>
               <button
                 type="button"
                 onClick={() => fillCredentials('admin@bookleaf.com', 'admin123')}
-                className="p-2.5 bg-surface hover:bg-blush/40 text-ink rounded-lg border border-line hover:border-brand transition-colors text-left"
+                className="p-2.5 bg-white hover:bg-blush-soft text-ink rounded-xl border border-line hover:border-coral/40 transition-colors text-left focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-coral cursor-pointer group"
               >
-                <div className="font-semibold text-ink">Admin</div>
+                <div className="font-semibold text-ink group-hover:text-coral-deep transition-colors">Admin</div>
                 <div className="text-muted truncate">admin@bookleaf.com</div>
               </button>
             </div>
           </div>
         </div>
-      </div>
+
+        {/* 3. Creative Footer Credit Tagline */}
+        <div className="mt-6 text-center space-y-1">
+          <p className="text-xs text-muted font-medium flex items-center justify-center gap-1.5">
+            <span>Made for BookLeaf team by</span>
+            <span className="font-semibold text-coral-deep">Deepanshu</span>
+            <Sparkles className="w-3.5 h-3.5 text-coral inline-block" />
+          </p>
+          <p className="text-[11px] text-muted/70">
+            Publishing Portal · Author &amp; Editorial Workspace
+          </p>
+        </div>
+      </main>
     </div>
   );
 };

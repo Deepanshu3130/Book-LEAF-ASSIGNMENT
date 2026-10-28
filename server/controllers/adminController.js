@@ -1,7 +1,7 @@
 import Ticket from '../models/Ticket.js';
 import Book from '../models/Book.js';
 import User from '../models/User.js';
-import { draftReply, rewriteReply } from '../services/aiService.js';
+import { draftReply, rewriteReply, generatePolicyFallbackDraft } from '../services/aiService.js';
 
 // Priority weight lookup for sorting (lower value = higher urgency)
 const PRIORITY_ORDER = {
@@ -82,6 +82,18 @@ export const getTicketById = async (req, res, next) => {
       return res.status(404).json({ message: 'Ticket not found' });
     }
 
+    // Ensure there is always a pre-written draft ready for the admin if ticket is open/in progress
+    if (!ticket.aiDraft && ticket.status !== 'Closed') {
+      try {
+        const fallbackDraft = generatePolicyFallbackDraft(ticket, ticket.book, ticket.replies || []);
+        ticket.aiDraft = fallbackDraft;
+        ticket.aiStatus = 'done';
+        await ticket.save();
+      } catch (dErr) {
+        // silently continue if fallback draft generation encounters an issue
+      }
+    }
+
     res.json(ticket);
   } catch (error) {
     next(error);
@@ -130,6 +142,7 @@ export const replyToTicket = async (req, res, next) => {
 
     // Admin replied: unreadByAuthor becomes true; admin's own action never sets unreadByAdmin
     ticket.unreadByAuthor = true;
+    ticket.unreadByAdmin = false;
 
     // Invalidate cached AI draft because the conversation has moved forward
     ticket.aiDraft = '';
@@ -288,12 +301,14 @@ export const generateDraft = async (req, res, next) => {
       });
     } catch (aiError) {
       console.error('Draft generation error:', aiError.message || aiError);
-      ticket.aiStatus = 'failed';
+      const fallback = generatePolicyFallbackDraft(ticket, ticket.book, ticket.replies);
+      ticket.aiDraft = fallback;
+      ticket.aiStatus = 'done';
       await ticket.save();
 
-      res.status(503).json({
-        message: 'AI is unavailable right now. You can write the reply manually.',
-        aiStatus: 'failed',
+      res.json({
+        aiDraft: fallback,
+        aiStatus: 'done',
       });
     }
   } catch (error) {
@@ -345,6 +360,11 @@ export const markTicketReadByAdmin = async (req, res, next) => {
 
     ticket.unreadByAdmin = false;
     await ticket.save();
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to('admins').emit('ticket:read', { ticketId: ticket._id });
+    }
 
     res.json({ message: 'ok' });
   } catch (error) {

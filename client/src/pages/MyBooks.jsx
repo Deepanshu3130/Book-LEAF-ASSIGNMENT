@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api';
 import Navbar from '../components/Navbar';
-import { BookOpen } from 'lucide-react';
+import PageBand from '../components/PageBand';
+import { BookStatusBadge } from '../components/StatusBadge';
+import Skeleton from '../components/Skeleton';
 
 export const MyBooks = () => {
   const [books, setBooks] = useState([]);
@@ -29,124 +31,157 @@ export const MyBooks = () => {
   const totalSold = books.reduce((acc, b) => acc + (b.total_copies_sold || 0), 0);
 
   return (
-    <div className="min-h-screen bg-page flex flex-col">
+    <div className="min-h-screen bg-white flex flex-col">
       <Navbar />
 
-      {/* Title Band with Soft Blush Background */}
-      <div className="bg-blush border-b border-line py-8 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <h1 className="text-2xl font-semibold text-ink">My published books &amp; royalties</h1>
-          <p className="text-sm text-muted mt-1 max-w-2xl">
-            Track your book sales, production stages, and earned royalty payouts.
-          </p>
-        </div>
-      </div>
+      <PageBand
+        title="My books"
+        subtitle="Your published books and royalties."
+      />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-1">
-        {/* Metrics Overview Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <div className="bg-surface p-5 rounded-xl border border-line">
-            <span className="text-xs text-muted block mb-1">Total books</span>
-            <div className="text-2xl font-semibold text-ink">{books.length}</div>
-            <div className="text-xs text-muted mt-1">{totalSold.toLocaleString()} copies sold</div>
-          </div>
-
-          <div className="bg-surface p-5 rounded-xl border border-line">
-            <span className="text-xs text-muted block mb-1">Total royalty earned</span>
-            <div className="text-2xl font-semibold text-ink">₹{totalEarned.toLocaleString()}</div>
-            <div className="text-xs text-muted mt-1">80% net author share</div>
-          </div>
-
-          <div className="bg-surface p-5 rounded-xl border border-line">
-            <span className="text-xs text-muted block mb-1">Royalty paid</span>
-            <div className="text-2xl font-semibold text-emerald-700">₹{totalPaid.toLocaleString()}</div>
-            <div className="text-xs text-muted mt-1">Disbursed via bank transfer</div>
-          </div>
-
-          <div className="bg-surface p-5 rounded-xl border border-line">
-            <span className="text-xs text-muted block mb-1">Royalty pending</span>
-            <div className="text-2xl font-semibold text-amber-700">₹{totalPending.toLocaleString()}</div>
-            <div className="text-xs text-muted mt-1">Processed quarterly</div>
-          </div>
-        </div>
-
-        {/* Loading / Error States */}
+      <main id="main" className="mx-auto max-w-6xl px-6 py-6 w-full flex-1 animate-fade-in-up">
         {loading ? (
-          <div className="text-center py-16 text-muted text-sm">Loading your books...</div>
+          <div className="space-y-6">
+            <Skeleton className="h-4 w-44" />
+            <div className="border border-line rounded-2xl p-6 bg-white">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[...Array(2)].map((_, i) => (
+                <div key={i} className="border border-line rounded-2xl p-5 bg-white space-y-3">
+                  <div className="flex justify-between">
+                    <Skeleton className="h-5 w-1/2" />
+                    <Skeleton className="h-4 w-24" />
+                  </div>
+                  <Skeleton className="h-3 w-3/4" />
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-4 w-2/3" />
+                </div>
+              ))}
+            </div>
+          </div>
         ) : error ? (
-          <div className="bg-rose-50 border border-rose-200 text-rose-700 p-4 rounded-xl text-sm">{error}</div>
+          <div className="border border-line text-body p-4 rounded-2xl text-sm bg-white">{error}</div>
         ) : books.length === 0 ? (
-          /* Empty State */
-          <div className="bg-surface border border-line rounded-xl p-12 text-center">
-            <BookOpen className="w-10 h-10 text-muted mx-auto mb-3 opacity-60" />
-            <h3 className="text-base font-semibold text-ink">No books found</h3>
-            <p className="text-sm text-muted mt-1">
-              You do not have any published books associated with your author account yet.
+          <div className="border border-line rounded-2xl p-12 text-center bg-white">
+            <p className="text-sm text-muted">
+              You have no books yet. Once a book is in production it will show up here.
             </p>
           </div>
         ) : (
-          /* Books Table */
-          <div className="bg-surface border border-line rounded-xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
-                <thead className="border-b border-line text-xs font-medium text-muted">
-                  <tr>
-                    <th scope="col" className="px-6 py-3.5">Book title &amp; ISBN</th>
-                    <th scope="col" className="px-6 py-3.5">Genre</th>
-                    <th scope="col" className="px-6 py-3.5">Published date</th>
-                    <th scope="col" className="px-6 py-3.5">Status</th>
-                    <th scope="col" className="px-6 py-3.5 text-right">MRP</th>
-                    <th scope="col" className="px-6 py-3.5 text-right">Sold</th>
-                    <th scope="col" className="px-6 py-3.5 text-right">Earned</th>
-                    <th scope="col" className="px-6 py-3.5 text-right">Paid</th>
-                    <th scope="col" className="px-6 py-3.5 text-right">Pending</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
-                  {books.map((book) => {
-                    const isLive = book.status === 'Published & Live';
-                    return (
-                      <tr key={book._id} className="hover:bg-blush/20 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="font-medium text-ink">{book.title}</div>
-                          <div className="text-xs text-muted font-mono mt-0.5">{book.isbn}</div>
-                        </td>
-                        <td className="px-6 py-4 text-muted">{book.genre}</td>
-                        <td className="px-6 py-4 text-muted whitespace-nowrap">
-                          {book.publication_date ? book.publication_date : <span className="italic">In production</span>}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1.5 text-xs text-ink font-medium">
-                            <span
-                              className={`w-2 h-2 rounded-full shrink-0 ${
-                                isLive ? 'bg-emerald-500' : 'bg-amber-500'
-                              }`}
-                            />
-                            <span>{book.status}</span>
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-right text-muted font-medium">
-                          {book.mrp !== null ? `₹${book.mrp}` : '—'}
-                        </td>
-                        <td className="px-6 py-4 text-right font-medium text-ink">
-                          {book.total_copies_sold ?? 0}
-                        </td>
-                        <td className="px-6 py-4 text-right font-semibold text-ink">
-                          ₹{(book.total_royalty_earned ?? 0).toLocaleString()}
-                        </td>
-                        <td className="px-6 py-4 text-right font-medium text-emerald-700">
-                          ₹{(book.royalty_paid ?? 0).toLocaleString()}
-                        </td>
-                        <td className="px-6 py-4 text-right font-medium text-amber-700">
-                          ₹{(book.royalty_pending ?? 0).toLocaleString()}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+          <>
+            {/* Counts above strip */}
+            <p className="text-sm text-muted mb-2">
+              {books.length} {books.length === 1 ? 'book' : 'books'} · {totalSold.toLocaleString()} copies sold
+            </p>
+
+            {/* ONE bordered white card with three figures side by side */}
+            <div className="border border-line rounded-2xl bg-white p-5 mb-8">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 divide-y sm:divide-y-0 sm:divide-x divide-line">
+                <div>
+                  <span className="text-xs text-muted block mb-1">Total earned</span>
+                  <span className="text-2xl font-semibold text-ink tabular-nums">
+                    ₹{totalEarned.toLocaleString()}
+                  </span>
+                </div>
+                <div className="pt-4 sm:pt-0 sm:pl-6">
+                  <span className="text-xs text-muted block mb-1">Paid</span>
+                  <span className="text-2xl font-semibold text-ink tabular-nums">
+                    ₹{totalPaid.toLocaleString()}
+                  </span>
+                </div>
+                <div className="pt-4 sm:pt-0 sm:pl-6">
+                  <span className="text-xs text-muted block mb-1">Pending</span>
+                  <span className="text-2xl font-semibold text-ink tabular-nums">
+                    ₹{totalPending.toLocaleString()}
+                  </span>
+                  <span className="text-xs text-muted block mt-1">Processed quarterly</span>
+                </div>
+              </div>
             </div>
-          </div>
+
+            {/* ONE CARD PER BOOK */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {books.map((book) => {
+                const inProduction = book.status !== 'Published & Live' || !book.publication_date;
+
+                return (
+                  <div
+                    key={book._id}
+                    className="bg-white border border-line rounded-2xl p-5"
+                  >
+                    {/* Top: title on left, status on right */}
+                    <div className="flex items-start justify-between gap-3 mb-1">
+                      <h3 className="font-semibold text-ink text-base leading-snug">
+                        {book.title}
+                      </h3>
+                      <div className="shrink-0">
+                        <BookStatusBadge status={book.status} />
+                      </div>
+                    </div>
+
+                    {/* Muted line: genre · published date · ISBN */}
+                    <p className="text-xs text-muted mb-4">
+                      {book.genre} · {book.publication_date || 'In production'} · {book.isbn}
+                    </p>
+
+                    {/* Middle: three figures in a bg-blush-soft inset */}
+                    <div className="bg-blush-soft rounded-xl p-3 mb-4">
+                      {inProduction ? (
+                        <>
+                          <div className="grid grid-cols-3 gap-2">
+                            <div>
+                              <span className="text-xs text-muted block">Earned</span>
+                              <span className="text-sm font-medium text-ink tabular-nums">₹0</span>
+                            </div>
+                            <div>
+                              <span className="text-xs text-muted block">Paid</span>
+                              <span className="text-sm font-medium text-ink tabular-nums">₹0</span>
+                            </div>
+                            <div>
+                              <span className="text-xs text-muted block">Pending</span>
+                              <span className="text-sm font-semibold text-ink tabular-nums">₹0</span>
+                            </div>
+                          </div>
+                          <span className="text-xs text-muted italic block mt-1">Not on sale yet</span>
+                        </>
+                      ) : (
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <span className="text-xs text-muted block">Earned</span>
+                            <span className="text-sm font-medium text-ink tabular-nums">
+                              ₹{(book.total_royalty_earned ?? 0).toLocaleString()}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-xs text-muted block">Paid</span>
+                            <span className="text-sm font-medium text-ink tabular-nums">
+                              ₹{(book.royalty_paid ?? 0).toLocaleString()}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-xs text-muted block">Pending</span>
+                            <span className="text-sm font-semibold text-ink tabular-nums">
+                              ₹{(book.royalty_pending ?? 0).toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Bottom muted line */}
+                    <p className="text-xs text-muted pt-3 border-t border-line">
+                      {book.mrp !== null ? `MRP ₹${book.mrp}` : 'MRP —'} · {(book.total_copies_sold ?? 0).toLocaleString()} copies sold
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </main>
     </div>

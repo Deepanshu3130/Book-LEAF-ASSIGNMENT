@@ -8,6 +8,7 @@ import NewTicket from './pages/NewTicket';
 import MyTickets from './pages/MyTickets';
 import AdminQueue from './pages/AdminQueue';
 import AdminTicket from './pages/AdminTicket';
+import NotFound from './pages/NotFound';
 
 // Simple route guard ensuring user is authenticated and authorized for the route role
 const ProtectedRoute = ({ children, requiredRole }) => {
@@ -40,7 +41,58 @@ const RootRedirect = () => {
 export const App = () => {
   return (
     <BrowserRouter>
-      <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
+      <Toaster
+        position="bottom-right"
+        gutter={10}
+        containerStyle={{
+          bottom: 24,
+          right: 24,
+        }}
+        toastOptions={{
+          duration: 3500,
+          style: {
+            background: '#ffffff',
+            color: '#3B3036',
+            border: '1px solid #F0D6DB',
+            borderRadius: '16px',
+            padding: '12px 18px',
+            fontSize: '13px',
+            fontWeight: '500',
+            lineHeight: '1.45',
+            boxShadow:
+              '0 10px 25px -5px rgba(59, 48, 54, 0.12), 0 4px 10px -4px rgba(59, 48, 54, 0.06)',
+            maxWidth: '420px',
+          },
+          success: {
+            duration: 3000,
+            iconTheme: {
+              primary: '#22A06B',
+              secondary: '#ffffff',
+            },
+            style: {
+              border: '1px solid #D1FAE5',
+              backgroundColor: '#FFFFFF',
+            },
+          },
+          error: {
+            duration: 4000,
+            iconTheme: {
+              primary: '#D92D20',
+              secondary: '#ffffff',
+            },
+            style: {
+              border: '1px solid #FEE2E2',
+              backgroundColor: '#FFFFFF',
+            },
+          },
+          loading: {
+            iconTheme: {
+              primary: '#F2687A',
+              secondary: '#ffffff',
+            },
+          },
+        }}
+      />
       <Routes>
         {/* Public login */}
         <Route path="/login" element={<Login />} />
@@ -91,7 +143,7 @@ export const App = () => {
 
         {/* Root fallback */}
         <Route path="/" element={<RootRedirect />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
   );

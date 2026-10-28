@@ -1,52 +1,45 @@
 import React from 'react';
+import { statusBadgeStyles, priorityBadgeStyles, getBookStatusStyle } from './badgeStyles';
 
 /**
- * Status indicator: small 8px colored dot + plain text.
+ * Status: small 8px dot + plain text (no pill, no border).
  * Open = blue, In Progress = amber, Resolved = green, Closed = grey.
  */
 export const StatusBadge = ({ status }) => {
-  const dotColors = {
-    Open: 'bg-blue-500',
-    'In Progress': 'bg-amber-500',
-    Resolved: 'bg-emerald-500',
-    Closed: 'bg-slate-400',
-  };
-
-  const dotClass = dotColors[status] || 'bg-slate-400';
+  const config = statusBadgeStyles[status] || statusBadgeStyles.Closed;
 
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs text-ink font-medium">
-      <span className={`w-2 h-2 rounded-full ${dotClass} shrink-0`} />
+    <span className={`inline-flex items-center gap-1.5 text-xs whitespace-nowrap ${config.text}`}>
+      <span className={`w-2 h-2 rounded-full shrink-0 ${config.dot}`} aria-hidden="true" />
       <span>{status}</span>
     </span>
   );
 };
 
 /**
- * Priority indicator: Critical (red dot), High (orange dot), Medium & Low (plain muted text).
+ * Priority: plain text; only Critical (red) and High (orange) get colour and are semibold.
+ * Medium and Low are muted. No flag icons, no pill borders.
  */
 export const PriorityBadge = ({ priority }) => {
-  if (priority === 'Critical') {
-    return (
-      <span className="inline-flex items-center gap-1.5 text-xs text-rose-600 font-semibold">
-        <span className="w-2 h-2 rounded-full bg-rose-600 shrink-0" />
-        <span>Critical</span>
-      </span>
-    );
-  }
-
-  if (priority === 'High') {
-    return (
-      <span className="inline-flex items-center gap-1.5 text-xs text-orange-600 font-medium">
-        <span className="w-2 h-2 rounded-full bg-orange-500 shrink-0" />
-        <span>High</span>
-      </span>
-    );
-  }
+  const config = priorityBadgeStyles[priority] || priorityBadgeStyles.Low;
 
   return (
-    <span className="text-xs text-muted font-normal">
+    <span className={`text-xs whitespace-nowrap ${config.text}`}>
       {priority}
+    </span>
+  );
+};
+
+/**
+ * Book publication status: small dot + text.
+ */
+export const BookStatusBadge = ({ status }) => {
+  const config = getBookStatusStyle(status);
+
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-xs whitespace-nowrap ${config.text}`}>
+      <span className={`w-2 h-2 rounded-full shrink-0 ${config.dot}`} aria-hidden="true" />
+      <span>{status}</span>
     </span>
   );
 };

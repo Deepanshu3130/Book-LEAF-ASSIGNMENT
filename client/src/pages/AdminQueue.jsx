@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import api from '../api';
 import Navbar from '../components/Navbar';
+import PageBand from '../components/PageBand';
 import { StatusBadge, PriorityBadge } from '../components/StatusBadge';
 import UnreadDot from '../components/UnreadDot';
+import CustomSelect from '../components/CustomSelect';
+import Skeleton from '../components/Skeleton';
 import { initSocket, disconnectSocket } from '../socket';
 import toast from 'react-hot-toast';
-import { RefreshCw, Inbox } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 
 const PRIORITY_ORDER = {
   Critical: 0,
@@ -15,7 +18,34 @@ const PRIORITY_ORDER = {
   Low: 3,
 };
 
+const STATUS_OPTIONS = [
+  { value: 'all', label: 'All statuses' },
+  { value: 'Open', label: 'Open' },
+  { value: 'In Progress', label: 'In progress' },
+  { value: 'Resolved', label: 'Resolved' },
+  { value: 'Closed', label: 'Closed' },
+];
+
+const CATEGORY_OPTIONS = [
+  { value: 'all', label: 'All categories' },
+  { value: 'Royalty & Payments', label: 'Royalty & payments' },
+  { value: 'ISBN & Metadata Issues', label: 'ISBN & metadata issues' },
+  { value: 'Printing & Quality', label: 'Printing & quality' },
+  { value: 'Distribution & Availability', label: 'Distribution & availability' },
+  { value: 'Book Status & Production Updates', label: 'Book status & production' },
+  { value: 'General Inquiry', label: 'General inquiry' },
+];
+
+const PRIORITY_OPTIONS = [
+  { value: 'all', label: 'All priorities' },
+  { value: 'Critical', label: 'Critical' },
+  { value: 'High', label: 'High' },
+  { value: 'Medium', label: 'Medium' },
+  { value: 'Low', label: 'Low' },
+];
+
 export const AdminQueue = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'my'
   const [allTickets, setAllTickets] = useState([]);
   const [myTickets, setMyTickets] = useState([]);
@@ -95,17 +125,16 @@ export const AdminQueue = () => {
     if (user?.id) {
       const socket = initSocket(user.id, user.role);
 
-      socket.on('ticket:classified', () => {
-        fetchTickets();
-      });
-      socket.on('ticket:updated', () => {
-        fetchTickets();
-      });
-    }
+      socket.on('ticket:classified', fetchTickets);
+      socket.on('ticket:updated', fetchTickets);
+      socket.on('ticket:read', fetchTickets);
+      window.addEventListener('ticket-read-updated', fetchTickets);
 
-    return () => {
-      disconnectSocket();
-    };
+      return () => {
+        disconnectSocket();
+        window.removeEventListener('ticket-read-updated', fetchTickets);
+      };
+    }
   }, [user?.id, statusFilter, categoryFilter, priorityFilter, dateFilter]);
 
   // Unread count bubble ONLY for "My tickets" tab
@@ -122,269 +151,348 @@ export const AdminQueue = () => {
   ).length;
 
   // Calculates ticket age in days
-  const getTicketAge = (createdAt) => {
+  const getTicketAge = (createdAt, isUnresolved) => {
     const diffMs = Date.now() - new Date(createdAt).getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    if (diffDays === 0) return { text: 'Today', days: 0 };
-    if (diffDays === 1) return { text: '1 day', days: 1 };
-    return { text: `${diffDays} days`, days: diffDays };
+    let text = `${diffDays} days`;
+    if (diffDays === 0) text = 'Today';
+    else if (diffDays === 1) text = '1 day';
+
+    let colorClass = 'text-muted';
+    if (isUnresolved && diffDays >= 3) {
+      colorClass = 'text-priority-critical font-medium';
+    }
+
+    return { text, days: diffDays, colorClass };
+  };
+
+  const clearFilters = () => {
+    setStatusFilter('all');
+    setCategoryFilter('all');
+    setPriorityFilter('all');
+    setDateFilter('');
+  };
+
+  const handleOpenTicket = (ticketId, isUnread) => {
+    if (isUnread) {
+      setMyTickets((prev) =>
+        prev.map((item) => (item._id === ticketId ? { ...item, unreadByAdmin: false } : item))
+      );
+      setAllTickets((prev) =>
+        prev.map((item) => (item._id === ticketId ? { ...item, unreadByAdmin: false } : item))
+      );
+      api.post(`/admin/tickets/${ticketId}/read`).catch(() => {});
+      window.dispatchEvent(new Event('ticket-read-updated'));
+    }
+    navigate(`/admin/tickets/${ticketId}`);
+  };
+
+  const getPriorityBorderClass = (priority) => {
+    if (priority === 'Critical') return 'border-l-4 border-l-priority-critical';
+    if (priority === 'High') return 'border-l-4 border-l-priority-high';
+    return 'border-l-4 border-l-transparent';
   };
 
   return (
-    <div className="min-h-screen bg-page flex flex-col">
+    <div className="min-h-screen bg-white flex flex-col">
       <Navbar />
 
-      {/* Title Band with Soft Blush Background */}
-      <div className="bg-blush border-b border-line py-8 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold text-ink">Support ticket queue</h1>
-            <p className="text-sm text-muted mt-1">
-              Manage and triage author inquiries across BookLeaf.
-            </p>
-          </div>
-
+      <PageBand
+        title="Support tickets"
+        subtitle="Manage and triage author inquiries."
+        action={
           <button
             onClick={() => fetchTickets(true)}
             disabled={refreshing}
-            className="inline-flex items-center self-start sm:self-auto px-4 py-2 rounded-full border border-line bg-surface text-muted hover:text-ink hover:border-line-dark text-xs font-medium transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand"
+            aria-label="Refresh queue"
+            className="btn-secondary text-xs"
           >
-            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${refreshing ? 'animate-spin text-brand' : ''}`} />
-            <span>Refresh queue</span>
+            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 text-muted ${refreshing ? 'animate-spin' : ''}`} />
+            <span>Refresh</span>
           </button>
-        </div>
-      </div>
+        }
+      >
+        {/* Summary: ONE plain line of text under the header */}
+        <p className="text-sm text-muted mb-3 flex items-center gap-1.5 flex-wrap">
+          <span className="font-semibold text-ink">{openCount}</span> open ·{' '}
+          <span className="font-semibold text-ink">{inProgressCount}</span> in progress ·{' '}
+          <span className="font-semibold text-ink">{criticalCount}</span> critical
+          {myUnreadCount > 0 && (
+            <>
+              <span className="text-line">·</span>
+              <span className="font-bold text-coral-deep animate-pulse">
+                {myUnreadCount} new {myUnreadCount === 1 ? 'reply' : 'replies'}
+              </span>
+            </>
+          )}
+        </p>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-1">
-        {/* Queue Summary: Clean single row with thin dividers and plain numbers */}
-        <div className="bg-surface border border-line rounded-xl p-5 mb-8 flex items-center divide-x divide-line">
-          <div className="flex-1 text-center sm:text-left sm:pl-4 first:pl-0">
-            <span className="text-xs text-muted block mb-1">Open tickets</span>
-            <span className="text-2xl font-semibold text-ink">{openCount}</span>
-          </div>
-          <div className="flex-1 text-center sm:text-left sm:pl-6">
-            <span className="text-xs text-muted block mb-1">In progress</span>
-            <span className="text-2xl font-semibold text-ink">{inProgressCount}</span>
-          </div>
-          <div className="flex-1 text-center sm:text-left sm:pl-6">
-            <span className="text-xs text-muted block mb-1">Critical (unresolved)</span>
-            <span className="text-2xl font-semibold text-ink">{criticalCount}</span>
-          </div>
-        </div>
-
-        {/* Tabs: All tickets / My tickets */}
-        <div className="flex items-center space-x-6 border-b border-line mb-6">
+        {/* Pill-shaped tabs container */}
+        <div className="inline-flex rounded-full bg-white border border-line p-1">
           <button
             type="button"
             onClick={() => setActiveTab('all')}
-            className={`pb-3 border-b-2 text-sm font-medium transition-colors ${
+            className={`px-4 py-1.5 rounded-full text-xs transition-colors cursor-pointer ${
               activeTab === 'all'
-                ? 'border-brand text-brand font-semibold'
-                : 'border-transparent text-muted hover:text-ink'
+                ? 'bg-coral text-white font-semibold'
+                : 'text-muted hover:text-ink font-medium'
             }`}
           >
-            <span>All tickets</span>
+            All tickets
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('my')}
-            className={`pb-3 border-b-2 text-sm font-medium transition-colors inline-flex items-center ${
+            className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs transition-colors cursor-pointer ${
               activeTab === 'my'
-                ? 'border-brand text-brand font-semibold'
-                : 'border-transparent text-muted hover:text-ink'
+                ? 'bg-coral text-white font-semibold'
+                : 'text-muted hover:text-ink font-medium'
             }`}
           >
             <span>My tickets</span>
             {myUnreadCount > 0 && (
-              <span className="ml-1.5 px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-brand text-white leading-tight">
+              <span
+                className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full leading-none shadow-2xs transition-colors ${
+                  activeTab === 'my'
+                    ? 'bg-white text-coral-deep'
+                    : 'bg-coral text-white'
+                }`}
+              >
                 {myUnreadCount}
               </span>
             )}
           </button>
         </div>
+      </PageBand>
 
-        {/* Filter Controls Bar */}
-        <div className="bg-surface p-4 rounded-xl border border-line mb-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-muted mb-1.5">
-                Status
-              </label>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full text-xs px-3 py-2 border border-line rounded-lg bg-surface text-ink focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand transition-colors"
-              >
-                <option value="all">All statuses</option>
-                <option value="Open">Open</option>
-                <option value="In Progress">In progress</option>
-                <option value="Resolved">Resolved</option>
-                <option value="Closed">Closed</option>
-              </select>
-            </div>
+      <main id="main" className="mx-auto max-w-6xl px-6 py-6 w-full flex-1 animate-fade-in-up">
+        {/* Toolbar: flex-wrap bar with bg-blush rounded-2xl sm:rounded-full p-2 gap-2 */}
+        <div className="bg-blush rounded-2xl sm:rounded-full p-2 flex flex-wrap items-center gap-2 mb-6">
+          <CustomSelect
+            id="filter-status"
+            ariaLabel="Filter tickets by status"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            options={STATUS_OPTIONS}
+            className="w-auto"
+            buttonClassName="rounded-full bg-white px-3.5 py-1.5 text-xs text-body border-0 outline-none focus-visible:ring-2 focus-visible:ring-coral cursor-pointer shadow-2xs flex items-center justify-between gap-1.5"
+          />
 
-            <div>
-              <label className="block text-xs font-medium text-muted mb-1.5">
-                Category
-              </label>
-              <select
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-                className="w-full text-xs px-3 py-2 border border-line rounded-lg bg-surface text-ink focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand transition-colors"
-              >
-                <option value="all">All categories</option>
-                <option value="Royalty & Payments">Royalty &amp; payments</option>
-                <option value="ISBN & Metadata Issues">ISBN &amp; metadata issues</option>
-                <option value="Printing & Quality">Printing &amp; quality</option>
-                <option value="Distribution & Availability">Distribution &amp; availability</option>
-                <option value="Book Status & Production Updates">Book status &amp; production</option>
-                <option value="General Inquiry">General inquiry</option>
-              </select>
-            </div>
+          <CustomSelect
+            id="filter-category"
+            ariaLabel="Filter tickets by category"
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            options={CATEGORY_OPTIONS}
+            className="w-auto max-w-[220px]"
+            buttonClassName="rounded-full bg-white px-3.5 py-1.5 text-xs text-body border-0 outline-none focus-visible:ring-2 focus-visible:ring-coral cursor-pointer shadow-2xs flex items-center justify-between gap-1.5"
+          />
 
-            <div>
-              <label className="block text-xs font-medium text-muted mb-1.5">
-                Priority
-              </label>
-              <select
-                value={priorityFilter}
-                onChange={(e) => setPriorityFilter(e.target.value)}
-                className="w-full text-xs px-3 py-2 border border-line rounded-lg bg-surface text-ink focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand transition-colors"
-              >
-                <option value="all">All priorities</option>
-                <option value="Critical">Critical</option>
-                <option value="High">High</option>
-                <option value="Medium">Medium</option>
-                <option value="Low">Low</option>
-              </select>
-            </div>
+          <CustomSelect
+            id="filter-priority"
+            ariaLabel="Filter tickets by priority"
+            value={priorityFilter}
+            onChange={(e) => setPriorityFilter(e.target.value)}
+            options={PRIORITY_OPTIONS}
+            className="w-auto"
+            buttonClassName="rounded-full bg-white px-3.5 py-1.5 text-xs text-body border-0 outline-none focus-visible:ring-2 focus-visible:ring-coral cursor-pointer shadow-2xs flex items-center justify-between gap-1.5"
+          />
 
-            <div>
-              <label className="block text-xs font-medium text-muted mb-1.5">
-                Created date
-              </label>
-              <input
-                type="date"
-                value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}
-                className="w-full text-xs px-3 py-2 border border-line rounded-lg bg-surface text-ink focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand transition-colors"
-              />
-            </div>
-          </div>
+          <input
+            id="filter-date"
+            type="date"
+            aria-label="Filter by created date"
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+            className="rounded-full bg-white px-3 py-1 text-xs text-body border-0 outline-none focus-visible:ring-2 focus-visible:ring-coral cursor-pointer shadow-2xs"
+          />
+
+          {(statusFilter !== 'all' || categoryFilter !== 'all' || priorityFilter !== 'all' || dateFilter) && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="text-xs text-coral-deep hover:underline cursor-pointer px-2 py-1"
+            >
+              Clear filters
+            </button>
+          )}
         </div>
 
-        {/* Tickets Table / Empty State */}
+        {/* Quiet header row (hidden on phone) */}
+        <div className="hidden md:grid md:grid-cols-[90px_1fr_130px_140px_110px_70px] items-center gap-4 px-5 py-2 text-xs text-muted font-normal mb-1">
+          <div>Priority</div>
+          <div>Subject</div>
+          <div>Author</div>
+          <div>Book</div>
+          <div>Status</div>
+          <div className="text-right">Age</div>
+        </div>
+
+        {/* Tickets List / Loading / Empty */}
         {loading ? (
-          <div className="text-center py-16 text-muted text-sm">Loading tickets...</div>
+          <div className="flex flex-col gap-2.5">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="bg-white border border-line rounded-2xl p-4 sm:px-5 sm:py-3.5">
+                <div className="hidden md:grid md:grid-cols-[90px_1fr_130px_140px_110px_70px] items-center gap-4">
+                  <Skeleton className="h-4 w-14" />
+                  <div className="space-y-1">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-1/3" />
+                  </div>
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-4 w-16" />
+                  <Skeleton className="h-4 w-12 ml-auto" />
+                </div>
+                <div className="md:hidden space-y-2">
+                  <div className="flex justify-between">
+                    <Skeleton className="h-4 w-16" />
+                    <Skeleton className="h-4 w-16" />
+                  </div>
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-3 w-1/2" />
+                </div>
+              </div>
+            ))}
+          </div>
         ) : displayedTickets.length === 0 ? (
-          <div className="bg-surface border border-line rounded-xl p-12 text-center">
-            <Inbox className="w-10 h-10 text-muted mx-auto mb-3 opacity-60" />
-            <h3 className="text-base font-semibold text-ink">
-              {activeTab === 'my' ? 'No tickets assigned to you' : 'No tickets found'}
-            </h3>
-            <p className="text-sm text-muted mt-1">
-              {activeTab === 'my'
-                ? 'You currently have no tickets assigned to your account.'
-                : 'No tickets match your active filter criteria. Try clearing some filters.'}
+          <div className="border border-line rounded-2xl p-12 text-center bg-white">
+            <p className="text-sm text-muted">
+              {activeTab === 'my' && myTickets.length === 0 && statusFilter === 'all' && categoryFilter === 'all' && priorityFilter === 'all' && !dateFilter ? (
+                'You currently have no tickets assigned to your account.'
+              ) : (
+                <>
+                  No tickets match these filters.{' '}
+                  <button
+                    onClick={clearFilters}
+                    className="text-coral-deep hover:underline font-medium cursor-pointer"
+                  >
+                    Clear filters
+                  </button>
+                </>
+              )}
             </p>
           </div>
         ) : (
-          <div className="bg-surface border border-line rounded-xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
-                <thead className="border-b border-line text-xs font-medium text-muted">
-                  <tr>
-                    <th scope="col" className="px-5 py-3.5">Priority</th>
-                    <th scope="col" className="px-5 py-3.5">Status</th>
-                    <th scope="col" className="px-5 py-3.5">Subject &amp; category</th>
-                    <th scope="col" className="px-5 py-3.5">Author</th>
-                    <th scope="col" className="px-5 py-3.5">Book</th>
-                    <th scope="col" className="px-5 py-3.5">Age</th>
-                    <th scope="col" className="px-5 py-3.5">Created date</th>
-                    <th scope="col" className="px-5 py-3.5 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
-                  {displayedTickets.map((t) => {
-                    const age = getTicketAge(t.createdAt);
-                    const isUnresolved = t.status === 'Open' || t.status === 'In Progress';
-                    const isOldUnresolved = isUnresolved && age.days > 3;
+          <div className="flex flex-col gap-2.5">
+            {displayedTickets.map((t) => {
+              const isUnresolved = t.status === 'Open' || t.status === 'In Progress';
+              const age = getTicketAge(t.createdAt, isUnresolved);
+              const isMyUnread = activeTab === 'my' && Boolean(t.unreadByAdmin);
+              const fullDate = new Date(t.createdAt).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              });
 
-                    // Unread rule: Only in "My tickets" tab does unreadByAdmin show dot, tint, and bold
-                    const isMyUnread = activeTab === 'my' && Boolean(t.unreadByAdmin);
+              const cardBgClass = isMyUnread
+                ? 'bg-[#f7fdf9] border-emerald-200/70 hover:bg-[#eefbf3] animate-blink-green'
+                : 'bg-white border-line hover:bg-blush-soft';
 
-                    return (
-                      <tr
-                        key={t._id}
-                        className={`transition-colors ${
-                          isMyUnread ? 'bg-green-50/60 hover:bg-green-50/80' : 'hover:bg-blush/20'
-                        }`}
-                      >
-                        <td className="px-5 py-4 whitespace-nowrap">
-                          <PriorityBadge priority={t.priority} />
-                        </td>
-                        <td className="px-5 py-4 whitespace-nowrap">
-                          <StatusBadge status={t.status} />
-                        </td>
-                        <td className="px-5 py-4">
-                          <div className="flex items-center gap-2">
-                            {/* Fixed slot for unread dot so all subjects line up vertically */}
-                            <span className="w-3 shrink-0 flex items-center justify-center">
-                              {isMyUnread && <UnreadDot />}
-                            </span>
-                            <span
-                              className={`text-ink max-w-xs truncate ${
-                                isMyUnread ? 'font-semibold' : 'font-normal'
-                              }`}
-                            >
-                              {t.subject}
-                            </span>
-                          </div>
-                          <div className="text-xs text-muted mt-0.5 ml-5">{t.category}</div>
-                        </td>
-                        <td className="px-5 py-4 whitespace-nowrap">
-                          <div className="font-medium text-ink">{t.author?.name}</div>
-                          <div className="text-xs text-muted">{t.author?.email}</div>
-                        </td>
-                        <td className="px-5 py-4 whitespace-nowrap text-muted">
-                          {t.book ? (
-                            <span className="text-ink font-medium">{t.book.title}</span>
-                          ) : (
-                            <span className="italic text-xs">General / account</span>
-                          )}
-                        </td>
-                        {/* Age Column (Red text if unresolved & older than 3 days) */}
-                        <td className="px-5 py-4 whitespace-nowrap">
-                          <span
-                            className={`text-xs ${
-                              isOldUnresolved ? 'text-rose-600 font-semibold' : 'text-muted'
-                            }`}
-                          >
-                            {age.text}
+              return (
+                <div
+                  key={t._id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleOpenTicket(t._id, Boolean(t.unreadByAdmin))}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleOpenTicket(t._id, Boolean(t.unreadByAdmin));
+                    }
+                  }}
+                  className={`rounded-2xl border transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-coral p-4 sm:px-5 sm:py-3.5 ${cardBgClass} ${getPriorityBorderClass(t.priority)}`}
+                >
+                  {/* Desktop Layout */}
+                  <div className="hidden md:grid md:grid-cols-[90px_1fr_130px_140px_110px_70px] items-center gap-4">
+                    <div className="whitespace-nowrap">
+                      <PriorityBadge priority={t.priority} />
+                    </div>
+
+                    <div className="min-w-0 pr-2">
+                      <div className="flex items-center gap-2">
+                        {isMyUnread && (
+                          <span className="w-3 shrink-0 flex items-center justify-center">
+                            <UnreadDot />
                           </span>
-                        </td>
-                        <td className="px-5 py-4 whitespace-nowrap text-xs text-muted">
-                          {new Date(t.createdAt).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            year: 'numeric',
-                          })}
-                        </td>
-                        <td className="px-5 py-4 whitespace-nowrap text-right">
-                          <Link
-                            to={`/admin/tickets/${t._id}`}
-                            className="text-brand hover:underline font-medium text-xs transition-colors"
-                          >
-                            Open
-                          </Link>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                        )}
+                        <Link
+                          to={`/admin/tickets/${t._id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className={`text-sm text-ink hover:text-coral-deep focus:underline outline-none truncate ${
+                            isMyUnread ? 'font-bold' : 'font-semibold'
+                          }`}
+                        >
+                          {t.subject}
+                        </Link>
+                      </div>
+                      <div className="text-xs text-muted mt-0.5 truncate">{t.category}</div>
+                    </div>
+
+                    <div className="whitespace-nowrap text-xs text-ink truncate">
+                      {t.author?.name || 'Unknown'}
+                    </div>
+
+                    <div className="whitespace-nowrap text-xs truncate">
+                      {t.book ? (
+                        <span className="text-ink">{t.book.title}</span>
+                      ) : (
+                        <span className="text-muted">General</span>
+                      )}
+                    </div>
+
+                    <div className="whitespace-nowrap">
+                      <StatusBadge status={t.status} />
+                    </div>
+
+                    <div className="whitespace-nowrap text-right">
+                      <span
+                        title={fullDate}
+                        className={`text-xs tabular-nums ${age.colorClass}`}
+                      >
+                        {age.text}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Mobile Layout (stacked fields) */}
+                  <div className="md:hidden space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <PriorityBadge priority={t.priority} />
+                      <StatusBadge status={t.status} />
+                    </div>
+
+                    <div>
+                      <div className="flex items-center gap-2">
+                        {isMyUnread && (
+                          <span className="w-3 shrink-0 flex items-center justify-center">
+                            <UnreadDot />
+                          </span>
+                        )}
+                        <Link
+                          to={`/admin/tickets/${t._id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className={`text-sm text-ink hover:text-coral-deep outline-none leading-snug ${
+                            isMyUnread ? 'font-bold' : 'font-semibold'
+                          }`}
+                        >
+                          {t.subject}
+                        </Link>
+                      </div>
+                      <div className="text-xs text-muted mt-0.5">{t.category}</div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-muted pt-1 border-t border-line/60">
+                      <span>{t.author?.name || 'Unknown'} · {t.book ? t.book.title : 'General'}</span>
+                      <span title={fullDate} className={`tabular-nums ${age.colorClass}`}>
+                        {age.text}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </main>

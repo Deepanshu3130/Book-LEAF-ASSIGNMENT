@@ -1,6 +1,6 @@
 import Ticket from '../models/Ticket.js';
 import Book from '../models/Book.js';
-import { classifyTicket } from '../services/aiService.js';
+import { classifyTicket, classifyFallback, draftReply, generatePolicyFallbackDraft } from '../services/aiService.js';
 
 // Creates a new ticket for an author and starts background AI classification
 export const createTicket = async (req, res, next) => {
@@ -21,67 +21,80 @@ export const createTicket = async (req, res, next) => {
       verifiedBookId = book._id;
     }
 
-    // Create ticket immediately with safe default metadata
+    // Fast & intelligent classification (Gemini with 6s timeout or smart policy fallback)
+    let classification = {
+      category: 'General Inquiry',
+      priority: 'Medium',
+      aiStatus: 'done',
+    };
+    try {
+      classification = await classifyTicket(subject.trim(), description.trim());
+    } catch (cErr) {
+      classification = classifyFallback(subject.trim(), description.trim());
+    }
+
+    // Create ticket immediately with accurate category and priority
     const ticket = await Ticket.create({
       author: req.user.id,
       book: verifiedBookId,
       subject: subject.trim(),
       description: description.trim(),
       status: 'Open',
-      category: 'General Inquiry',
-      priority: 'Medium',
-      aiStatus: 'pending',
+      category: classification.category || 'General Inquiry',
+      priority: classification.priority || 'Medium',
+      aiStatus: classification.aiStatus || 'done',
       unreadByAdmin: true,
       unreadByAuthor: false,
     });
 
-    // Populate book before returning immediate response (strip confidential fields & unreadByAdmin)
+    // Populate book before returning response (strip confidential fields & unreadByAdmin)
     const populatedTicket = await Ticket.findById(ticket._id)
       .populate('book', 'title isbn status')
       .select('-internalNotes -aiDraft -unreadByAdmin');
 
-    // Respond immediately so author is not blocked by AI latency
+    // Respond immediately with fully classified ticket
     res.status(201).json(populatedTicket);
 
-    // Notify admins room immediately that a new ticket was created
+    // Notify admins room and author room immediately with the classified ticket
     const initialIo = req.app.get('io');
     if (initialIo) {
-      const fullDocForAdmin = await Ticket.findById(ticket._id)
-        .populate('book', 'title isbn status')
-        .populate('author', 'name email phone city');
-      if (fullDocForAdmin) {
-        initialIo.to('admins').emit('ticket:updated', fullDocForAdmin);
-        initialIo.emit('ticket:classified', fullDocForAdmin);
-      }
+      (async () => {
+        try {
+          const fullDocForAdmin = await Ticket.findById(ticket._id)
+            .populate('book', 'title isbn status')
+            .populate('author', 'name email phone city');
+          if (fullDocForAdmin) {
+            initialIo.to('admins').emit('ticket:updated', fullDocForAdmin);
+            initialIo.emit('ticket:classified', fullDocForAdmin);
+          }
+        } catch (e) {}
+      })();
     }
 
-    // Asynchronous background classification
+    // Asynchronous background pre-generation of AI reply draft for admin
     (async () => {
       try {
-        const classification = await classifyTicket(ticket.subject, ticket.description);
-        ticket.category = classification.category;
-        ticket.priority = classification.priority;
-        ticket.aiStatus = classification.aiStatus;
-        await ticket.save();
-
-        const updatedDoc = await Ticket.findById(ticket._id)
+        const fullDocForDraft = await Ticket.findById(ticket._id)
           .populate('book', 'title isbn status')
           .populate('author', 'name email');
-
-        const io = req.app.get('io');
-        if (io && updatedDoc) {
-          const cleanDoc = updatedDoc.toObject();
-          delete cleanDoc.internalNotes;
-          delete cleanDoc.aiDraft;
-          delete cleanDoc.unreadByAdmin; // Authors never receive unreadByAdmin
-
-          // Notify author room and admin queue
-          io.to(req.user.id.toString()).emit('ticket:updated', cleanDoc);
-          io.to('admins').emit('ticket:updated', updatedDoc);
-          io.emit('ticket:classified', updatedDoc);
+        if (fullDocForDraft) {
+          let initialDraft = null;
+          try {
+            initialDraft = await draftReply(fullDocForDraft, fullDocForDraft.book, []);
+          } catch (err) {
+            initialDraft = generatePolicyFallbackDraft(fullDocForDraft, fullDocForDraft.book, []);
+          }
+          if (initialDraft) {
+            fullDocForDraft.aiDraft = initialDraft;
+            await fullDocForDraft.save();
+            const io = req.app.get('io');
+            if (io) {
+              io.to('admins').emit('ticket:updated', fullDocForDraft);
+            }
+          }
         }
-      } catch (classifyErr) {
-        console.error('Async classification failed:', classifyErr.message || classifyErr);
+      } catch (dErr) {
+        console.warn('Initial background draft generation failed:', dErr.message || dErr);
       }
     })();
   } catch (error) {
@@ -129,12 +142,7 @@ export const addAuthorReply = async (req, res, next) => {
       return res.status(400).json({ message: 'This ticket is closed. Please raise a new ticket.' });
     }
 
-    // Reopen ticket if author replies to a resolved ticket
-    if (ticket.status === 'Resolved') {
-      ticket.status = 'Open';
-    }
-
-    // Push author reply with from: 'author'
+    // Push author reply with from: 'author' (status stays intact: Resolved remains Resolved)
     ticket.replies.push({
       message: message.trim(),
       sentBy: req.user.id,
@@ -178,6 +186,35 @@ export const addAuthorReply = async (req, res, next) => {
     delete cleanResponse.aiDraft;
     delete cleanResponse.unreadByAdmin; // Authors never receive unreadByAdmin
 
+    // Asynchronously pre-generate AI draft for admin based on author's latest reply
+    (async () => {
+      try {
+        const fullTicket = await Ticket.findById(ticket._id)
+          .populate('author', 'name email')
+          .populate('book')
+          .populate('replies.sentBy', 'name role');
+        if (fullTicket) {
+          let draft = null;
+          try {
+            draft = await draftReply(fullTicket, fullTicket.book, fullTicket.replies);
+          } catch (err) {
+            draft = generatePolicyFallbackDraft(fullTicket, fullTicket.book, fullTicket.replies);
+          }
+          if (draft) {
+            fullTicket.aiDraft = draft;
+            fullTicket.aiStatus = 'done';
+            await fullTicket.save();
+            const io = req.app.get('io');
+            if (io) {
+              io.to('admins').emit('ticket:updated', fullTicket);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Background draft generation on reply failed:', err.message || err);
+      }
+    })();
+
     res.status(200).json(cleanResponse);
   } catch (error) {
     next(error);
@@ -194,6 +231,11 @@ export const markTicketReadByAuthor = async (req, res, next) => {
 
     ticket.unreadByAuthor = false;
     await ticket.save();
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(req.user.id.toString()).emit('ticket:read', { ticketId: ticket._id });
+    }
 
     res.json({ message: 'ok' });
   } catch (error) {

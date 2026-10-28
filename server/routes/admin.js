@@ -34,11 +34,14 @@ router.get('/tickets', getTicketsQueue);
 // Single ticket detail
 router.get('/tickets/:id', getTicketById);
 
-// Send reply
+// Send reply (support both /reply and /replies)
 router.post('/tickets/:id/reply', replyToTicket);
+router.post('/tickets/:id/replies', replyToTicket);
 
-// Update status, category, priority, assignedTo
+// Update status, category, priority, assignedTo (support /tickets/:id, /override, /assign)
 router.patch('/tickets/:id', updateTicket);
+router.patch('/tickets/:id/override', updateTicket);
+router.patch('/tickets/:id/assign', updateTicket);
 
 // Add private internal note
 router.post('/tickets/:id/notes', addInternalNote);

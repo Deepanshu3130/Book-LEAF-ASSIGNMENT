@@ -11,6 +11,16 @@ export const initSocket = (userId, role) => {
       transports: ['websocket', 'polling'],
       withCredentials: true,
     });
+
+    socket.on('connect', () => {
+      const u = JSON.parse(localStorage.getItem('user') || 'null');
+      if (u?.id) {
+        socket.emit('join', { userId: u.id, role: u.role });
+        if (u.role === 'admin') {
+          socket.emit('join:admins');
+        }
+      }
+    });
   }
 
   if (userId) {
