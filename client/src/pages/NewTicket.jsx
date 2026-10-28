@@ -73,7 +73,7 @@ export const NewTicket = () => {
         subtitle="Tell us what you need help with."
       />
 
-      <main id="main" className="mx-auto max-w-6xl px-6 py-6 w-full flex-1 animate-fade-in-up">
+      <main id="main" className="mx-auto max-w-6xl px-4 sm:px-6 py-5 sm:py-6 w-full flex-1 animate-fade-in-up">
         {/* On smaller screens, show the selected book above the form */}
         <div className="block lg:hidden mb-6 bg-blush rounded-2xl p-4">
           <span className="text-xs font-medium text-muted block mb-2">
@@ -102,7 +102,7 @@ export const NewTicket = () => {
         {/* 2-Column Layout: Form on left, Selected Book panel on right */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
           {/* Form Container */}
-          <div className="lg:col-span-2 bg-white border border-line rounded-2xl p-6 sm:p-8">
+          <div className="lg:col-span-2 bg-white border border-line rounded-2xl p-4 sm:p-6 sm:p-8">
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Book Selection */}
               <div>

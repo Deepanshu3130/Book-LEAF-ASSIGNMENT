@@ -92,7 +92,7 @@ export const Navbar = () => {
       </a>
 
       <header className="bg-white border-b border-line sticky top-0 z-30">
-        <div className="max-w-6xl mx-auto px-6">
+        <div className="max-w-6xl mx-auto px-3.5 sm:px-6">
           <div className="flex items-center justify-between h-14">
             {/* BookLeaf Logo */}
             <Link
@@ -113,7 +113,7 @@ export const Navbar = () => {
             </Link>
 
             {/* Navigation Links */}
-            <nav className="flex items-center space-x-4 sm:space-x-6 text-sm">
+            <nav className="flex items-center space-x-2 sm:space-x-5 text-xs sm:text-sm">
               {!isAdmin ? (
                 <>
                   <Link to="/books" className={linkClass('/books')}>
@@ -151,7 +151,7 @@ export const Navbar = () => {
               )}
 
               {/* User name and sign out */}
-              <div className="flex items-center pl-4 border-l border-line space-x-3 ml-2">
+              <div className="flex items-center pl-2 sm:pl-4 border-l border-line space-x-2 sm:space-x-3 ml-1 sm:ml-2">
                 <span className="hidden sm:inline text-sm text-ink font-medium">
                   {user?.name}
                 </span>

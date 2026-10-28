@@ -59,7 +59,7 @@ export const ConfirmModal = ({
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2.5 mt-6 pt-3 border-t border-line/60">
+        <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2.5 mt-6 pt-3 border-t border-line/60">
           <button
             ref={cancelButtonRef}
             type="button"

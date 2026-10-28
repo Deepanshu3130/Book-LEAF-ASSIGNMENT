@@ -61,7 +61,7 @@ export const createTicket = async (req, res, next) => {
       (async () => {
         try {
           const fullDocForAdmin = await Ticket.findById(ticket._id)
-            .populate('book', 'title isbn status')
+            .populate('book')
             .populate('author', 'name email phone city');
           if (fullDocForAdmin) {
             initialIo.to('admins').emit('ticket:updated', fullDocForAdmin);
@@ -74,8 +74,9 @@ export const createTicket = async (req, res, next) => {
     // Asynchronous background pre-generation of AI reply draft for admin
     (async () => {
       try {
+        await new Promise((r) => setTimeout(r, 1000));
         const fullDocForDraft = await Ticket.findById(ticket._id)
-          .populate('book', 'title isbn status')
+          .populate('book')
           .populate('author', 'name email');
         if (fullDocForDraft) {
           let initialDraft = null;

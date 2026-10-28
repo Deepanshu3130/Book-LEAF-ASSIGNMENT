@@ -112,7 +112,7 @@ export const TicketCard = ({ ticket, onTicketUpdated, isExpanded, onToggleExpand
       ref={cardRef}
       className={`rounded-2xl transition-all duration-200 overflow-hidden ${
         expanded
-          ? 'bg-white scale-[1.015] shadow-lg relative z-10 border border-line/60'
+          ? 'bg-white sm:scale-[1.015] shadow-lg relative z-10 border border-line/60'
           : isBlinking
           ? 'animate-blink-green border border-emerald-200/60 shadow-2xs'
           : 'bg-white shadow-sm hover:shadow-md border border-line/40'

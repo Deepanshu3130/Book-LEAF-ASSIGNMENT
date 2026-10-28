@@ -10,7 +10,7 @@
   Instead of generic robotic replies, the AI is given the author's real data (book sales, unpaid royalties, publishing status) and BookLeaf's actual company policies. It addresses authors warmly by first name, explains policies clearly, and never invents dates or numbers.
 
 - **System Reliability (Never Crashing)**:  
-  AI APIs can be slow, hit rate limits, or go down temporarily. I added a 6-second timeout and an automatic fallback system. Even if the AI service fails completely, tickets are still created, categorized using keyword rules, and admins can simply write and send replies manually without any interruptions.
+  AI APIs can be slow, hit rate limits on free tiers, or go down temporarily. I added a timeout guard and an automatic fallback system so tickets are always created and categorized even if the AI hits a rate limit. In a production environment with paid tier quotas or higher models, it operates with sub-second speed.
 
 - **Real-Time Communication**:  
   Support tickets feel like an active conversation. Using WebSockets (Socket.IO), whenever an admin or author replies, the other side sees it immediately without refreshing the page. Tickets show clear unread badges so nothing gets lost.

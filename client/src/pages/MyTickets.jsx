@@ -174,7 +174,7 @@ export const MyTickets = () => {
             </p>
 
             {/* 2. Pill Filter Tabs */}
-            <div className="inline-flex rounded-full bg-white border border-line p-1">
+            <div className="max-w-full overflow-x-auto inline-flex rounded-full bg-white border border-line p-1">
               <button
                 type="button"
                 onClick={() => setFilterTab('all')}
@@ -215,7 +215,7 @@ export const MyTickets = () => {
         )}
       </PageBand>
 
-      <main id="main" className="mx-auto max-w-3xl px-6 py-6 w-full flex-1 animate-fade-in-up">
+      <main id="main" className="mx-auto max-w-3xl px-4 sm:px-6 py-5 sm:py-6 w-full flex-1 animate-fade-in-up">
         {/* Loading Skeletons */}
         {loading ? (
           <div className="space-y-4">

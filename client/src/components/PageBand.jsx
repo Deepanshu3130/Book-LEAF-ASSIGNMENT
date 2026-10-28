@@ -13,7 +13,7 @@ import React from 'react';
  */
 export const PageBand = ({ title, subtitle, action, above, children }) => {
   return (
-    <div className="relative overflow-hidden bg-blush rounded-b-[32px]">
+    <div className="relative overflow-hidden bg-blush rounded-b-[24px] sm:rounded-b-[32px]">
       {/* Decorative blob + swirl lines */}
       <svg
         viewBox="-100 -100 200 200"
@@ -29,14 +29,14 @@ export const PageBand = ({ title, subtitle, action, above, children }) => {
       </svg>
 
       {/* Content */}
-      <div className="relative z-10 mx-auto max-w-6xl px-6 py-7">
+      <div className="relative z-10 mx-auto max-w-6xl px-4 sm:px-6 py-5 sm:py-7">
         {/* Above slot (e.g. back link) */}
         {above && <div className="mb-2">{above}</div>}
 
         {/* Title row */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-coral-deep">{title}</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-coral-deep leading-tight">{title}</h1>
             {subtitle && <p className="text-sm text-muted mt-1">{subtitle}</p>}
           </div>
           {action && <div className="shrink-0">{action}</div>}

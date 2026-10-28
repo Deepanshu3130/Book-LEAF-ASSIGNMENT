@@ -228,7 +228,7 @@ export const AdminQueue = () => {
         </p>
 
         {/* Pill-shaped tabs container */}
-        <div className="inline-flex rounded-full bg-white border border-line p-1">
+        <div className="max-w-full overflow-x-auto inline-flex rounded-full bg-white border border-line p-1">
           <button
             type="button"
             onClick={() => setActiveTab('all')}
@@ -266,7 +266,7 @@ export const AdminQueue = () => {
         </div>
       </PageBand>
 
-      <main id="main" className="mx-auto max-w-6xl px-6 py-6 w-full flex-1 animate-fade-in-up">
+      <main id="main" className="mx-auto max-w-6xl px-4 sm:px-6 py-5 sm:py-6 w-full flex-1 animate-fade-in-up">
         {/* Toolbar: flex-wrap bar with bg-blush rounded-2xl sm:rounded-full p-2 gap-2 */}
         <div className="bg-blush rounded-2xl sm:rounded-full p-2 flex flex-wrap items-center gap-2 mb-6">
           <CustomSelect
@@ -484,7 +484,7 @@ export const AdminQueue = () => {
                     </div>
 
                     <div className="flex items-center justify-between text-xs text-muted pt-1 border-t border-line/60">
-                      <span>{t.author?.name || 'Unknown'} · {t.book ? t.book.title : 'General'}</span>
+                      <span className="truncate mr-2 min-w-0">{t.author?.name || 'Unknown'} · {t.book ? t.book.title : 'General'}</span>
                       <span title={fullDate} className={`tabular-nums ${age.colorClass}`}>
                         {age.text}
                       </span>

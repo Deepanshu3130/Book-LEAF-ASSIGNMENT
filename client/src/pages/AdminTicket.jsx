@@ -326,7 +326,7 @@ export const AdminTicket = () => {
             <Skeleton className="h-4 w-28" />
           </div>
         </PageBand>
-        <main id="main" className="mx-auto max-w-6xl px-6 py-6 w-full flex-1 animate-fade-in-up">
+        <main id="main" className="mx-auto max-w-6xl px-4 sm:px-6 py-5 sm:py-6 w-full flex-1 animate-fade-in-up">
           <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-5">
             <div className="space-y-5">
               <div className="bg-white border border-line rounded-2xl p-6 space-y-4">
@@ -411,7 +411,7 @@ export const AdminTicket = () => {
         </div>
       </PageBand>
 
-      <main id="main" className="mx-auto max-w-6xl px-6 py-6 w-full flex-1 animate-fade-in-up">
+      <main id="main" className="mx-auto max-w-6xl px-4 sm:px-6 py-5 sm:py-6 w-full flex-1 animate-fade-in-up">
         {/* 2-Column Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-5 items-start">
           {/* Left Column */}
@@ -440,8 +440,8 @@ export const AdminTicket = () => {
                         key={i}
                         className={`p-3.5 rounded-2xl text-sm ${
                           isStaff
-                            ? 'bg-blush text-body mr-4 sm:mr-8'
-                            : 'bg-white border border-line text-body ml-4 sm:ml-8'
+                            ? 'bg-blush text-body mr-2 sm:mr-8'
+                            : 'bg-white border border-line text-body ml-2 sm:ml-8'
                         }`}
                       >
                         <div className="flex items-center justify-between text-xs pb-2 mb-2 border-b border-line/60">

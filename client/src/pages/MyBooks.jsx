@@ -39,7 +39,7 @@ export const MyBooks = () => {
         subtitle="Your published books and royalties."
       />
 
-      <main id="main" className="mx-auto max-w-6xl px-6 py-6 w-full flex-1 animate-fade-in-up">
+      <main id="main" className="mx-auto max-w-6xl px-4 sm:px-6 py-5 sm:py-6 w-full flex-1 animate-fade-in-up">
         {loading ? (
           <div className="space-y-6">
             <Skeleton className="h-4 w-44" />
