@@ -368,7 +368,7 @@ Using Socket.IO:
    - `GEMINI_API_KEY`: `<Your Gemini API Key>`
    - `AI_MODEL`: `gemini-3.5-flash-lite`
 
-### 3. Frontend (Vercel)
+### 3. Frontend (Render)
 1. Import the repository on [render] and set the root directory to `client`.
 2. Build command: `npm run build`
 3. Output directory: `dist`
