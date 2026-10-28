@@ -129,21 +129,21 @@ All AI functionality is isolated in `server/services/aiService.js` and `server/s
 - **AI Rewrite Helper**: Enables administrators to instantly restyle any drafted reply into one of 4 modes: *Polish* (grammar & clarity), *Shorter* (concise & direct), *More empathetic* (warm & supportive), or *More formal* (executive tone). Includes one-click "Undo" to restore previous text.
 
 ### Error Handling & Fallbacks
-- **15-Second Timeout**: All LLM calls are wrapped in `Promise.race()` with an abort timer.
-- **Classification Failure**: If the API key is invalid, the rate limit is hit, or the network drops, `classifyTicket` catches the error and safely returns:
-  `{ category: "General Inquiry", priority: "Medium", aiStatus: "failed" }`. The ticket is created normally and the server never crashes.
-- **Drafting Failure**: If `POST /api/admin/tickets/:id/draft` fails, the backend returns HTTP 503 with a friendly message: *"AI is unavailable right now. You can write the reply manually."* In the UI, the reply box remains 100% editable by hand.
+- **Graceful Timeout & Circuit Breaker**: LLM calls are wrapped in `Promise.race()` with a timeout.
+- **Dual-Layer Intelligent Fallback**: If the Gemini API is down, rate-limited, or returns a 503 during peak traffic, `classifyTicket` catches the error and instantly invokes `classifyFallback(subject, description)`. This rule-based heuristic analyzes keywords (e.g. royalties, payouts, ISBN, printing, Amazon stock sync) to maintain high classification accuracy rather than blindly defaulting to "General Inquiry".
+- **Policy Fallback for Drafts**: If draft generation fails or is offline, `generatePolicyFallbackDraft` synthesizes an empathetic, fact-grounded response using the BookLeaf knowledge base rules and book records.
+- **Manual Override Guarantee**: Admins can always manually override classification, priority, or write/edit drafts directly.
 
 ### Cost Management
-1. **Model**: Uses Google Gemini Flash (`gemini-3.5-flash-lite`), offering rapid responses and ultra-low cost per token.
-2. **Strict Output Caps**:
-   - Classification: `maxOutputTokens: 100` (JSON only).
-   - Reply Drafting: `maxOutputTokens: 500` (Plain text).
-3. **No Redundant Calls**: Drafts are persisted in `ticket.aiDraft`. When an admin opens a ticket that already has an AI draft, it loads from MongoDB without making a new API call unless the admin explicitly clicks "Regenerate".
-4. **Input Pruning**: Only the last 2 conversation replies are passed to the draft context.
+1. **Model**: Uses Google Gemini Flash (`gemini-3.5-flash`), balancing state-of-the-art speed, reasoning quality, and ultra-low token cost.
+2. **Output Caps**:
+   - Classification: `maxOutputTokens: 1000` (strictly JSON mode).
+   - Reply Drafting: `maxOutputTokens: 800` (concise, professional plain text).
+3. **No Redundant Calls**: Drafts are persisted in `ticket.aiDraft`. When an admin opens a ticket with an existing draft, it loads directly from MongoDB without invoking the LLM again.
+4. **Input Pruning**: Only the latest conversational context and category-relevant knowledge base sections are transmitted.
 
 ### Model Choice & Parameters
-- **`gemini-3.5-flash-lite`**: High speed, sub-second latency, lightweight footprint, and native support for JSON schema enforcement and system instructions.
+- **`gemini-3.5-flash`**: Selected for its low latency, high instruction-following adherence, native JSON schema mode, and predictable cost-to-performance ratio for customer support operations.
 
 ---
 
@@ -223,7 +223,7 @@ Creates a support ticket and kicks off background AI triage.
 Returns all tickets raised by the author. Private admin notes and AI drafts are removed.
 
 #### `POST /api/tickets/:id/replies`
-Allows the author to reply directly on their existing ticket, maintaining a continuous two-way conversation thread. If replying to a `Resolved` ticket, automatically reopens it to `Open`. Sets `unreadByAdmin: true`, invalidates cached AI drafts, and broadcasts real-time updates to the `admins` room.
+Allows the author to reply directly on their existing ticket, maintaining a continuous two-way conversation thread. If replying to a `Resolved` ticket, the resolved status is preserved while setting `unreadByAdmin: true` and invalidating cached AI drafts so support can review the author's follow-up in real time.
 - **Request Body**:
   ```json
   {
