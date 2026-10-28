@@ -2,6 +2,8 @@
 
 A full-stack MERN application for BookLeaf Publishing that streamlines support between published authors and the support team. Features real-time WebSocket communication, automated ticket classification, and policy-grounded AI reply drafting powered by Google Gemini.
 
+> **UI Inspiration**: The user interface is thoughtfully inspired by BookLeaf Publishing's official public website, featuring their signature coral & blush color palette (`#F2687A`, `#FDEEF0`), clean typography (Lato & Raleway), and accessible, modern card layouts.
+
 ---
 
 ## Table of Contents
@@ -105,8 +107,9 @@ Visit **`http://localhost:5173`** in your browser.
 5. **Non-Blocking Asynchronous Ticket Creation**:
    - When an author raises a ticket, the ticket is saved and returned **immediately** with HTTP 201.
    - Gemini's triage classification runs in the background. Once finished, the updated category and priority are broadcast live via Socket.IO. The author never stares at a spinner waiting for an LLM.
-5. **Tailwind CSS + Vite**:
-   - Fast hot-module-replacement and minimal CSS bundle size without custom stylesheets.
+6. **Tailwind CSS + Vite (Official Brand-Inspired Aesthetics)**:
+   - Fast hot-module-replacement and minimal bundle size.
+   - The UI styling, color scheme (`coral` #F2687A, `blush` #FDEEF0), fonts, and card interactions are directly modeled on BookLeaf Publishing's official public website, providing a natural, brand-consistent experience for authors.
 
 ---
 
