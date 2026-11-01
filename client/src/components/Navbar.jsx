@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import api from '../api';
-import { initSocket } from '../socket';
+import { initSocket, disconnectSocket } from '../socket';
 import { LogOut } from 'lucide-react';
 import ConfirmModal from './ConfirmModal';
 
@@ -67,6 +67,7 @@ export const Navbar = () => {
   }, [isAdmin, user?.id, location.pathname]);
 
   const handleLogout = () => {
+    disconnectSocket();
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     navigate('/login');

@@ -408,6 +408,11 @@ export const AdminTicket = () => {
           <PriorityBadge priority={ticket.priority} />
           <span>·</span>
           <span>{ticket.category}</span>
+          {ticket.aiStatus === 'failed' && (
+            <span className="text-xs text-muted italic">
+              · AI was unavailable, so this category and priority were set by rules. Please check them.
+            </span>
+          )}
         </div>
       </PageBand>
 
@@ -716,6 +721,11 @@ export const AdminTicket = () => {
                     options={CATEGORY_OPTIONS}
                     ariaLabel="Override category"
                   />
+                  {ticket.aiStatus === 'failed' && (
+                    <p className="text-[11px] text-muted mt-1 italic leading-tight">
+                      AI was unavailable, so this category and priority were set by rules. Please check them.
+                    </p>
+                  )}
                 </div>
 
                 <div>

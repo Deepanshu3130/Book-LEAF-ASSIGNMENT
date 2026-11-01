@@ -15,10 +15,10 @@ import {
 
 const router = express.Router();
 
-// Rate limiter for AI draft generation to protect upstream API costs
+// Rate limiter for AI draft generation (raised to 60 requests per 15 min since admins may share a proxy IP)
 const draftLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 30, // limit each IP to 30 draft requests per 15 min
+  max: 60, // limit each IP to 60 draft requests per 15 min
   message: { message: 'Too many AI draft requests. Please wait a few minutes before trying again.' },
   standardHeaders: true,
   legacyHeaders: false,

@@ -5,6 +5,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
 import { Server } from 'socket.io';
+import jwt from 'jsonwebtoken';
 
 import authRoutes from './routes/auth.js';
 import bookRoutes from './routes/books.js';
@@ -15,6 +16,10 @@ import errorHandler from './middleware/errorHandler.js';
 dotenv.config();
 
 const app = express();
+
+// Trust first proxy hop (e.g. Render/reverse proxy) so rate limiters see real client IPs
+app.set('trust proxy', 1);
+
 const server = http.createServer(app);
 
 const PORT = process.env.PORT || 5000;
@@ -33,24 +38,29 @@ const io = new Server(server, {
 // Attach io instance to express app for access in controllers
 app.set('io', io);
 
-// Socket.IO connection and room management
-io.on('connection', (socket) => {
-  // Join a dedicated room for author or admin based on user id and optional role
-  socket.on('join', (data) => {
-    if (typeof data === 'string') {
-      socket.join(data);
-    } else if (data && data.userId) {
-      socket.join(data.userId.toString());
-      if (data.role === 'admin') {
-        socket.join('admins');
-      }
-    }
-  });
+// Socket.IO authentication middleware: verifies JWT on connection handshake
+io.use((socket, next) => {
+  const token = socket.handshake.auth?.token;
+  if (!token) {
+    return next(new Error('Unauthorized'));
+  }
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    socket.user = { id: decoded.id, role: decoded.role };
+    next();
+  } catch (err) {
+    next(new Error('Unauthorized'));
+  }
+});
 
-  // Admins join the shared 'admins' room for live queue and ticket updates
-  socket.on('join:admins', () => {
-    socket.join('admins');
-  });
+// Socket.IO connection: rooms are assigned strictly from verified JWT data
+io.on('connection', (socket) => {
+  if (socket.user?.id) {
+    socket.join(socket.user.id.toString());
+    if (socket.user.role === 'admin') {
+      socket.join('admins');
+    }
+  }
 
   socket.on('disconnect', () => {
     // Clean disconnection

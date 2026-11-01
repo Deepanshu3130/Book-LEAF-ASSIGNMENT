@@ -1,7 +1,16 @@
 import Ticket from '../models/Ticket.js';
 import Book from '../models/Book.js';
 import User from '../models/User.js';
-import { draftReply, rewriteReply, generatePolicyFallbackDraft } from '../services/aiService.js';
+import {
+  draftReply,
+  rewriteReply,
+  generatePolicyFallbackDraft,
+  ALLOWED_CATEGORIES,
+  ALLOWED_PRIORITIES,
+} from '../services/aiService.js';
+
+// Whitelist of valid ticket statuses
+const ALLOWED_STATUSES = ['Open', 'In Progress', 'Resolved', 'Closed'];
 
 // Priority weight lookup for sorting (lower value = higher urgency)
 const PRIORITY_ORDER = {
@@ -17,22 +26,47 @@ export const getTicketsQueue = async (req, res, next) => {
     const { status, category, priority, date, assignedTo } = req.query;
 
     const query = {};
-    if (status && status !== 'all') query.status = status;
-    if (category && category !== 'all') query.category = category;
-    if (priority && priority !== 'all') query.priority = priority;
+
+    // Validate status filter against allowed list
+    if (status && status !== 'all') {
+      if (typeof status !== 'string' || !ALLOWED_STATUSES.includes(status)) {
+        return res.status(400).json({ message: 'Invalid status filter' });
+      }
+      query.status = status;
+    }
+
+    // Validate category filter against allowed list
+    if (category && category !== 'all') {
+      if (typeof category !== 'string' || !ALLOWED_CATEGORIES.includes(category)) {
+        return res.status(400).json({ message: 'Invalid category filter' });
+      }
+      query.category = category;
+    }
+
+    // Validate priority filter against allowed list
+    if (priority && priority !== 'all') {
+      if (typeof priority !== 'string' || !ALLOWED_PRIORITIES.includes(priority)) {
+        return res.status(400).json({ message: 'Invalid priority filter' });
+      }
+      query.priority = priority;
+    }
 
     // Filter by tickets assigned specifically to the current admin
     if (assignedTo === 'me') {
       query.assignedTo = req.user.id;
     }
 
-    // Filter by specific calendar date (YYYY-MM-DD) if provided
+    // Filter by specific calendar date (YYYY-MM-DD) in Indian Standard Time (BookLeaf operates in IST)
     if (date) {
-      const startDate = new Date(date);
-      startDate.setHours(0, 0, 0, 0);
-      const endDate = new Date(date);
-      endDate.setHours(23, 59, 59, 999);
-      query.createdAt = { $gte: startDate, $lte: endDate };
+      if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return res.status(400).json({ message: 'Invalid date filter' });
+      }
+      const start = new Date(`${date}T00:00:00.000+05:30`);
+      const end = new Date(`${date}T23:59:59.999+05:30`);
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return res.status(400).json({ message: 'Invalid date filter' });
+      }
+      query.createdAt = { $gte: start, $lte: end };
     }
 
     const tickets = await Ticket.find(query)
@@ -80,18 +114,6 @@ export const getTicketById = async (req, res, next) => {
 
     if (!ticket) {
       return res.status(404).json({ message: 'Ticket not found' });
-    }
-
-    // Ensure there is always a pre-written draft ready for the admin if ticket is open/in progress
-    if (!ticket.aiDraft && ticket.status !== 'Closed') {
-      try {
-        const fallbackDraft = generatePolicyFallbackDraft(ticket, ticket.book, ticket.replies || []);
-        ticket.aiDraft = fallbackDraft;
-        ticket.aiStatus = 'done';
-        await ticket.save();
-      } catch (dErr) {
-        // silently continue if fallback draft generation encounters an issue
-      }
     }
 
     res.json(ticket);
@@ -166,7 +188,7 @@ export const replyToTicket = async (req, res, next) => {
 
       io.to(ticket.author.toString()).emit('ticket:updated', cleanTicket);
       io.to('admins').emit('ticket:updated', populatedTicket);
-      io.emit('ticket:classified', populatedTicket);
+      io.to('admins').emit('ticket:classified', populatedTicket);
     }
 
     res.json(populatedTicket);
@@ -183,6 +205,35 @@ export const updateTicket = async (req, res, next) => {
     const ticket = await Ticket.findById(req.params.id);
     if (!ticket) {
       return res.status(404).json({ message: 'Ticket not found' });
+    }
+
+    // Validate status against allowed values if provided
+    if (status !== undefined) {
+      if (typeof status !== 'string' || !ALLOWED_STATUSES.includes(status)) {
+        return res.status(400).json({ message: 'Invalid status value' });
+      }
+    }
+
+    // Validate category against allowed values if provided
+    if (category !== undefined) {
+      if (typeof category !== 'string' || !ALLOWED_CATEGORIES.includes(category)) {
+        return res.status(400).json({ message: 'Invalid category value' });
+      }
+    }
+
+    // Validate priority against allowed values if provided
+    if (priority !== undefined) {
+      if (typeof priority !== 'string' || !ALLOWED_PRIORITIES.includes(priority)) {
+        return res.status(400).json({ message: 'Invalid priority value' });
+      }
+    }
+
+    // Validate assignedTo if provided: must be an existing admin user, or empty/null to unassign
+    if (assignedTo !== undefined && assignedTo !== null && assignedTo !== '') {
+      const adminUser = await User.findOne({ _id: assignedTo, role: 'admin' });
+      if (!adminUser) {
+        return res.status(400).json({ message: 'assignedTo must be an existing admin' });
+      }
     }
 
     // If admin is closing the ticket and it was not already closed, automatically send a closing notification to author
@@ -231,7 +282,7 @@ export const updateTicket = async (req, res, next) => {
 
       io.to(ticket.author.toString()).emit('ticket:updated', cleanTicket);
       io.to('admins').emit('ticket:updated', populatedTicket);
-      io.emit('ticket:classified', populatedTicket);
+      io.to('admins').emit('ticket:classified', populatedTicket);
     }
 
     res.json(populatedTicket);
@@ -284,33 +335,32 @@ export const generateDraft = async (req, res, next) => {
       return res.status(404).json({ message: 'Ticket not found' });
     }
 
-    // If an explicit status was supplied (e.g. from the admin status selector), apply it for the draft
-    if (overrideStatus && ['Open', 'In Progress', 'Resolved', 'Closed'].includes(overrideStatus)) {
-      ticket.status = overrideStatus;
+    // Build a plain copy for the prompt preview without modifying the real ticket in DB
+    const draftTicket = ticket.toObject();
+    const validStatuses = ['Open', 'In Progress', 'Resolved', 'Closed'];
+    if (overrideStatus && validStatuses.includes(overrideStatus)) {
+      draftTicket.status = overrideStatus;
     }
 
+    let draft = '';
     try {
-      const draft = await draftReply(ticket, ticket.book, ticket.replies);
+      draft = await draftReply(draftTicket, draftTicket.book, draftTicket.replies);
+    } catch (aiError) {
+      console.error('Draft generation error:', aiError.message || aiError);
+      draft = generatePolicyFallbackDraft(draftTicket, draftTicket.book, draftTicket.replies);
+    }
+
+    // Only cache in DB when there is no override or the override matches the current status
+    if (!overrideStatus || overrideStatus === ticket.status) {
       ticket.aiDraft = draft;
       ticket.aiStatus = 'done';
       await ticket.save();
-
-      res.json({
-        aiDraft: draft,
-        aiStatus: 'done',
-      });
-    } catch (aiError) {
-      console.error('Draft generation error:', aiError.message || aiError);
-      const fallback = generatePolicyFallbackDraft(ticket, ticket.book, ticket.replies);
-      ticket.aiDraft = fallback;
-      ticket.aiStatus = 'done';
-      await ticket.save();
-
-      res.json({
-        aiDraft: fallback,
-        aiStatus: 'done',
-      });
     }
+
+    res.json({
+      aiDraft: draft,
+      aiStatus: 'done',
+    });
   } catch (error) {
     next(error);
   }

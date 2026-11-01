@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { disconnectSocket } from './socket.js';
 
 // Base Axios client configured for BookLeaf API
 const api = axios.create({
@@ -13,5 +14,19 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+// Handle expired or invalid tokens by clearing state and redirecting to login
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401 && !error.config?.url?.includes('/auth/login')) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      disconnectSocket();
+      window.location.assign('/login');
+    }
+    return Promise.reject(error);
+  }
+);
 
 export default api;

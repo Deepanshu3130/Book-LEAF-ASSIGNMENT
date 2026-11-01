@@ -2,7 +2,7 @@ import Ticket from '../models/Ticket.js';
 import Book from '../models/Book.js';
 import { classifyTicket, classifyFallback, normalizeCategory, normalizePriority, draftReply, generatePolicyFallbackDraft } from '../services/aiService.js';
 
-// Creates a new ticket for an author and starts background AI classification
+// Creates a new ticket for an author and starts background AI classification & drafting
 export const createTicket = async (req, res, next) => {
   try {
     const { subject, description, bookId } = req.body;
@@ -11,7 +11,7 @@ export const createTicket = async (req, res, next) => {
       return res.status(400).json({ message: 'Subject and description are required' });
     }
 
-    // Verify book ownership if a bookId was provided
+    // 1. Verify book ownership if a bookId was provided
     let verifiedBookId = null;
     if (bookId && bookId !== 'general') {
       const book = await Book.findOne({ _id: bookId, author: req.user.id });
@@ -21,91 +21,128 @@ export const createTicket = async (req, res, next) => {
       verifiedBookId = book._id;
     }
 
-    // Fast & intelligent classification (Gemini with 6s timeout or smart policy fallback)
-    let classification = {
-      category: 'General Inquiry',
-      priority: 'Medium',
-      aiStatus: 'done',
-    };
-    try {
-      classification = await classifyTicket(subject.trim(), description.trim());
-    } catch (cErr) {
-      classification = classifyFallback(subject.trim(), description.trim());
-    }
-
-    const resolvedCategory =
-      normalizeCategory(classification?.category) ||
-      classifyFallback(subject.trim(), description.trim()).category ||
-      'General Inquiry';
-
-    const resolvedPriority =
-      normalizePriority(classification?.priority) ||
-      classifyFallback(subject.trim(), description.trim()).priority ||
-      'Medium';
-
-    // Create ticket immediately with accurate category and priority
+    // 2. Create ticket immediately with defaults (AI classification runs in background)
     const ticket = await Ticket.create({
       author: req.user.id,
       book: verifiedBookId,
       subject: subject.trim(),
       description: description.trim(),
       status: 'Open',
-      category: resolvedCategory,
-      priority: resolvedPriority,
-      aiStatus: classification.aiStatus || 'done',
+      category: 'General Inquiry',
+      priority: 'Medium',
+      aiStatus: 'pending',
       unreadByAdmin: true,
       unreadByAuthor: false,
     });
 
-    // Populate book before returning response (strip confidential fields & unreadByAdmin)
+    // 3. Populate book and respond immediately (strip confidential fields & unreadByAdmin)
     const populatedTicket = await Ticket.findById(ticket._id)
       .populate('book', 'title isbn status')
       .select('-internalNotes -aiDraft -unreadByAdmin');
 
-    // Respond immediately with fully classified ticket
     res.status(201).json(populatedTicket);
 
-    // Notify admins room and author room immediately with the classified ticket
-    const initialIo = req.app.get('io');
-    if (initialIo) {
+    const io = req.app.get('io');
+
+    // Notify admins room right away so admins see the new ticket at once
+    if (io) {
       (async () => {
         try {
-          const fullDocForAdmin = await Ticket.findById(ticket._id)
+          const docForAdmin = await Ticket.findById(ticket._id)
             .populate('book')
             .populate('author', 'name email phone city');
-          if (fullDocForAdmin) {
-            initialIo.to('admins').emit('ticket:updated', fullDocForAdmin);
-            initialIo.emit('ticket:classified', fullDocForAdmin);
+          if (docForAdmin) {
+            io.to('admins').emit('ticket:updated', docForAdmin);
           }
-        } catch (e) {}
+        } catch (e) {
+          console.warn('Initial admin ticket:updated broadcast failed:', e.message || e);
+        }
       })();
     }
 
-    // Asynchronous background pre-generation of AI reply draft for admin
+    // 4. Background async job: classify with AI and pre-generate first reply draft
     (async () => {
       try {
-        await new Promise((r) => setTimeout(r, 1000));
-        const fullDocForDraft = await Ticket.findById(ticket._id)
+        // Step A: Classify ticket with AI (12s timeout) or intelligent fallback
+        let classification;
+        try {
+          classification = await classifyTicket(subject.trim(), description.trim());
+        } catch (cErr) {
+          console.warn('Background classification failed:', cErr.message || cErr);
+          classification = {
+            ...classifyFallback(subject.trim(), description.trim()),
+            aiStatus: 'failed',
+          };
+        }
+
+        const category =
+          normalizeCategory(classification?.category) ||
+          classifyFallback(subject.trim(), description.trim()).category ||
+          'General Inquiry';
+
+        const priority =
+          normalizePriority(classification?.priority) ||
+          classifyFallback(subject.trim(), description.trim()).priority ||
+          'Medium';
+
+        const aiStatus = classification?.aiStatus || 'done';
+
+        // Save classification only if aiStatus is still pending (protects against concurrent admin override)
+        const classifiedDoc = await Ticket.findOneAndUpdate(
+          { _id: ticket._id, aiStatus: 'pending' },
+          { $set: { category, priority, aiStatus } },
+          { new: true }
+        )
+          .populate('book')
+          .populate('author', 'name email phone city');
+
+        if (classifiedDoc && io) {
+          // Broadcast to admins room
+          io.to('admins').emit('ticket:classified', classifiedDoc);
+          io.to('admins').emit('ticket:updated', classifiedDoc);
+
+          // Broadcast clean doc to author's room
+          const cleanDoc = classifiedDoc.toObject();
+          delete cleanDoc.internalNotes;
+          delete cleanDoc.aiDraft;
+          delete cleanDoc.unreadByAdmin;
+          io.to(req.user.id.toString()).emit('ticket:updated', cleanDoc);
+        }
+
+        // Step B: Generate initial AI reply draft using conditional update pattern
+        const currentDoc = await Ticket.findById(ticket._id)
           .populate('book')
           .populate('author', 'name email');
-        if (fullDocForDraft) {
+
+        if (currentDoc && currentDoc.status !== 'Closed') {
+          const startStatus = currentDoc.status;
+          const startReplyCount = currentDoc.replies?.length || 0;
+
           let initialDraft = null;
           try {
-            initialDraft = await draftReply(fullDocForDraft, fullDocForDraft.book, []);
-          } catch (err) {
-            initialDraft = generatePolicyFallbackDraft(fullDocForDraft, fullDocForDraft.book, []);
+            initialDraft = await draftReply(currentDoc, currentDoc.book, []);
+          } catch (dErr) {
+            console.warn('Background draft generation failed:', dErr.message || dErr);
+            initialDraft = generatePolicyFallbackDraft(currentDoc, currentDoc.book, []);
           }
+
           if (initialDraft) {
-            fullDocForDraft.aiDraft = initialDraft;
-            await fullDocForDraft.save();
-            const io = req.app.get('io');
-            if (io) {
-              io.to('admins').emit('ticket:updated', fullDocForDraft);
+            // Save draft only if ticket status and replies have not changed in the meantime
+            const updated = await Ticket.findOneAndUpdate(
+              { _id: ticket._id, status: startStatus, replies: { $size: startReplyCount } },
+              { $set: { aiDraft: initialDraft, aiStatus: 'done' } },
+              { new: true }
+            )
+              .populate('book')
+              .populate('author', 'name email');
+
+            if (updated && io) {
+              io.to('admins').emit('ticket:updated', updated);
             }
           }
         }
-      } catch (dErr) {
-        console.warn('Initial background draft generation failed:', dErr.message || dErr);
+      } catch (bgErr) {
+        console.warn('Background classification and draft job encountered error:', bgErr.message || bgErr);
       }
     })();
   } catch (error) {
@@ -185,7 +222,7 @@ export const addAuthorReply = async (req, res, next) => {
 
       // Broadcast full populated doc (with unreadByAdmin) to admins room and queue
       io.to('admins').emit('ticket:updated', populatedTicket);
-      io.emit('ticket:classified', populatedTicket);
+      io.to('admins').emit('ticket:classified', populatedTicket);
 
       // Broadcast clean doc to author's room
       io.to(req.user.id.toString()).emit('ticket:updated', cleanDoc);
@@ -204,7 +241,10 @@ export const addAuthorReply = async (req, res, next) => {
           .populate('author', 'name email')
           .populate('book')
           .populate('replies.sentBy', 'name role');
-        if (fullTicket) {
+        if (fullTicket && fullTicket.status !== 'Closed') {
+          const startStatus = fullTicket.status;
+          const startReplyCount = fullTicket.replies?.length || 0;
+
           let draft = null;
           try {
             draft = await draftReply(fullTicket, fullTicket.book, fullTicket.replies);
@@ -212,12 +252,20 @@ export const addAuthorReply = async (req, res, next) => {
             draft = generatePolicyFallbackDraft(fullTicket, fullTicket.book, fullTicket.replies);
           }
           if (draft) {
-            fullTicket.aiDraft = draft;
-            fullTicket.aiStatus = 'done';
-            await fullTicket.save();
-            const io = req.app.get('io');
-            if (io) {
-              io.to('admins').emit('ticket:updated', fullTicket);
+            // Save draft only if ticket status and replies have not changed in the meantime
+            const updated = await Ticket.findOneAndUpdate(
+              { _id: ticket._id, status: startStatus, replies: { $size: startReplyCount } },
+              { $set: { aiDraft: draft, aiStatus: 'done' } },
+              { new: true }
+            )
+              .populate('book')
+              .populate('author', 'name email');
+
+            if (updated) {
+              const io = req.app.get('io');
+              if (io) {
+                io.to('admins').emit('ticket:updated', updated);
+              }
             }
           }
         }

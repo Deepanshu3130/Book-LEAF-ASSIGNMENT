@@ -4,30 +4,15 @@ const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
 
 let socket = null;
 
-// Connect to socket server and join personal room + admins room if applicable
+// Connect to socket server with dynamic JWT token authentication
 export const initSocket = (userId, role) => {
   if (!socket) {
     socket = io(SOCKET_URL, {
       transports: ['websocket', 'polling'],
-      withCredentials: true,
+      auth: (cb) => {
+        cb({ token: localStorage.getItem('token') });
+      },
     });
-
-    socket.on('connect', () => {
-      const u = JSON.parse(localStorage.getItem('user') || 'null');
-      if (u?.id) {
-        socket.emit('join', { userId: u.id, role: u.role });
-        if (u.role === 'admin') {
-          socket.emit('join:admins');
-        }
-      }
-    });
-  }
-
-  if (userId) {
-    socket.emit('join', { userId, role });
-    if (role === 'admin') {
-      socket.emit('join:admins');
-    }
   }
 
   return socket;

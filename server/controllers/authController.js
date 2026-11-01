@@ -7,8 +7,8 @@ export const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
-    // Simple manual input validation
-    if (!email || !password) {
+    // Validate input types: reject non-string values or empty inputs
+    if (typeof email !== 'string' || typeof password !== 'string' || !email.trim() || !password.trim()) {
       return res.status(400).json({ message: 'Email and password are required' });
     }
 
