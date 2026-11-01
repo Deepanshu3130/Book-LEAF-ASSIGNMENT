@@ -381,11 +381,12 @@ The application uses Socket.IO with strict handshake-level JWT authentication:
    - `AI_MODEL`: `gemini-2.0-flash-lite` (or another Flash-Lite model on the free tier)
 5. *Note*: The server automatically sets `app.set('trust proxy', 1)` to correctly identify client IPs behind Render's proxy for express-rate-limit.
 
-### 3. Frontend (Vercel)
-1. Import the repository on [Vercel](https://vercel.com) and set the Root Directory to `client`.
-2. Framework Preset: `Vite`.
-3. Build command: `npm run build`
-4. Output directory: `dist`
-5. Set Environment Variables:
+
+=======
+### 3. Frontend (Render)
+1. Import the repository on [render] and set the root directory to `client`.
+2. Build command: `npm run build`
+3. Output directory: `dist`
+4. Set Environment Variables:
    - `VITE_API_URL`: `https://<your-render-backend>.onrender.com/api`
    - `VITE_SOCKET_URL`: `https://<your-render-backend>.onrender.com`
